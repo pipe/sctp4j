@@ -37,7 +37,7 @@ import org.ice4j.ice.Candidate;
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
 public class IceConnectJSON extends IceConnect {
-    private String _session,_to,_type;
+    private String _session,_to,_type,_mid;
 
     public IceConnectJSON(int port) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
         super(port);
@@ -81,6 +81,7 @@ public class IceConnectJSON extends IceConnect {
                     JsonObject jcandy = (JsonObject) v_candy;
                     addCandidate(jcandy.getString("foundation"), jcandy.getString("component"), jcandy.getString("protocol"), jcandy.getString("priority"), jcandy.getString("ip"), jcandy.getString("port"), jcandy.getString("type"));
                 }
+                _mid = ((JsonObject) content).getString("mid","data");
             }
         }
 
@@ -140,8 +141,15 @@ public class IceConnectJSON extends IceConnect {
                                                 .add("print", getPrint())
                                                 .add("required", "1")
                                         )
-                                        .add("mid", "data")
+                                        .add("mid", _mid)
                                         .add("setup", "passive")
+                                        .add("sctpmap", Json.createArrayBuilder()
+                                                .add(Json.createObjectBuilder()
+                                                    .add("port",5000)
+                                                    .add("app","webrtc-datachannel")
+                                                    .add("count",256)
+                                                )
+                                        )
                                 )
                         )
                         .add("session", Json.createObjectBuilder()
