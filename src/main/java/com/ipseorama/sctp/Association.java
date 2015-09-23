@@ -134,6 +134,9 @@ abstract public class Association {
     private final AssociationListener _al;
     private HashMap<Long, DataChunk> _outbound;
     private State _state;
+    private  HashMap<Long, DataChunk> _holdingPen ;
+
+    ;
 
     class CookieHolder {
 
@@ -218,6 +221,8 @@ abstract public class Association {
         _transp = transport;
         _streams = new HashMap();
         _outbound = new HashMap<Long, DataChunk>();
+        _holdingPen = new HashMap<Long, DataChunk>();
+
         _state = State.CLOSED;
         if (_transp != null) {
             startRcv();
@@ -235,13 +240,6 @@ abstract public class Association {
             Log.warn("Heh ? Blocked empty packet send()");
         }
     }
-
-    /**
-     * make a timer that is appropriate for the association's threading scheme
-     *
-     * @return
-     */
-    public abstract SCTPTimer mkTimer();
 
     /**
      *
@@ -398,44 +396,71 @@ abstract public class Association {
         return reply;
     }
 
-    private Chunk[] dataDeal(DataChunk dc) {
-        // need to think about how this actually works...
-        // for now only deal with them in order. which is hokey but retries will cover the gap for now.
-        ArrayList<Chunk> rep = new ArrayList();
-        Chunk dummy[] = new Chunk[0];
+    private void ingest(DataChunk dc, ArrayList<Chunk> rep) {
         Integer sno = dc.getStreamId();
         long tsn = dc.getTsn();
-        if (tsn == _farTSN) {
-            SCTPStream in = _streams.get(sno);
-            if (in == null) {
-                in = mkStream(sno);
-                _streams.put(sno, in);
+        SCTPStream in = _streams.get(sno);
+        if (in == null) {
+            in = mkStream(sno);
+            _streams.put(sno, in);
+        }
+        Chunk[] repa;
+        if (dc.getDCEP() != null) {
+            repa = dcepDeal(in, dc, dc.getDCEP());
+            if (_al != null) {
+                _al.onStream(in);
             }
-            Chunk[] repa;
-            if (dc.getDCEP() != null) {
-                repa = dcepDeal(in, dc, dc.getDCEP());
-                if (_al != null) {
-                    _al.onStream(in);
-                }
 
-            } else {
-                repa = in.append(dc);
-            }
-            if (repa != null) {
-                for (Chunk r : repa) {
-                    rep.add(r);
-                }
-            }
-            in.inbound(dc);
-            _farTSN = tsn + 1;
         } else {
+            repa = in.append(dc);
+        }
+        if (repa != null) {
+            for (Chunk r : repa) {
+                rep.add(r);
+            }
+        }
+        in.inbound(dc);
+        _farTSN = tsn;
+    }
 
+    private Chunk[] dataDeal(DataChunk dc) {
+        ArrayList<Chunk> rep = new ArrayList();
+        Chunk dummy[] = new Chunk[0];
+        long tsn = dc.getTsn();
+
+        if (tsn > _farTSN) {
+            // progress at least
+            // look for cached entries in the holding pen
+            
+//NOTE - strategy here should be :
+            // 1) put this one in teh holding pen
+            // 2) iterate from _farTSN upwards
+            // 3)  looking for holding pen items that match
+            // 4)  ingest them and remove from pen
+            // 5) until we hit a gap.
+            
+            boolean hole = false;
+            for (long t = _farTSN+1 ; t< tsn; t++){
+                Long l = new Long(t);
+                dc = _holdingPen.remove(l);
+                if (dc != null){
+                    ingest(dc,rep);
+                } else {
+                    hole = true;
+                    break;
+                }
+            }
+            if (!hole){
+                ingest(dc, rep);
+            }
+        } else {
+            // probably wrong now.. 
             if (tsn < _farTSN) {
                 Log.warn("Already seen . " + tsn + " expecting " + (_farTSN));
                 // should log as duplicate
             } else {
                 Log.warn("Not seen " + _farTSN + " yet, so ignoring " + (tsn));
-                // should stash this for later and generate selective ack
+                _holdingPen.put(new Long(dc.getTsn()),dc);
             }
         }
         SackChunk sack = mkSack();
@@ -550,7 +575,7 @@ abstract public class Association {
         // it assumes no gaps, because we ignore unexpected packets in dataDeal()
         // mucho room for improvement....
         SackChunk ret = new SackChunk();
-        ret.setCumuTSNAck(_farTSN - 1);
+        ret.setCumuTSNAck(_farTSN - 1); // why ? why not _farTSN ?
         int stashcap = calcStashCap();
         ret.setArWin(MAXBUFF - stashcap);
         return ret;

@@ -58,6 +58,8 @@ public class DataChunk extends Chunk {
     private DCOpen _open;
     private InvalidDataChunkException _invalid;
     private boolean _gapAck;
+    private long _retryTime;
+    private int _retryCount;
 
     public DataChunk(byte type, byte flags, int length, ByteBuffer pkt) {
         super(type, flags, length, pkt);
@@ -292,5 +294,13 @@ public class DataChunk extends Chunk {
 
     public boolean getGapAck() {
         return _gapAck;
+    }
+
+    public void setRetryTime(long l) {
+        _retryTime = l;
+        _retryCount ++;
+    }
+    public long getRetryTime(){
+        return _retryTime;
     }
 }

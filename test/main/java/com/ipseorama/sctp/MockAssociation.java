@@ -34,10 +34,7 @@ public class MockAssociation extends Association {
         super(transport, al);
     }
 
-    @Override
-    public SCTPTimer mkTimer() {
-        throw new UnsupportedOperationException("Not supported yet. (mkTimer)"); //To change body of generated methods, choose Tools | Templates.
-    }
+
 
     @Override
     public void enqueue(DataChunk d) {

@@ -16,12 +16,35 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
-package com.ipseorama.sctp;
+package com.ipseorama.sctp.small;
+
+import com.ipseorama.sctp.SCTPTimer;
+import java.util.Timer;
+import java.util.TimerTask;
 
 /**
- * interface that hides the threading implementation.
- * @author Westhawk Ltd<thp@westhawk.co.uk>
+ *
+ * @author tim
+ * Assumption is that timers _always_ go off - it is up to the 
+ * runnable to decide if something needs to be done or not.
  */
-public interface SCTPTimer {
-    public void setRunnable(Runnable r,long at);
+class SimpleSCTPTimer implements SCTPTimer {
+    private final Timer _timer;
+
+    public SimpleSCTPTimer() {
+        _timer = new Timer();        
+    }
+
+    @Override
+    public void setRunnable(Runnable r, long at) {
+        final Runnable torun = r;
+        TimerTask tick = new TimerTask(){
+            @Override
+            public void run() {
+                torun.run();
+            }         
+        };
+        _timer.schedule(tick, at);
+    }
+    
 }

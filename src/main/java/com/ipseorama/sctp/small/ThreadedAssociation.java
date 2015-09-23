@@ -21,7 +21,6 @@ import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.AssociationListener;
 import com.ipseorama.sctp.SCTPMessage;
 import com.ipseorama.sctp.SCTPStream;
-import com.ipseorama.sctp.SCTPTimer;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
 import com.ipseorama.sctp.messages.InitChunk;
@@ -32,8 +31,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 
 /**
@@ -41,12 +38,15 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-public class ThreadedAssociation extends Association {
+public class ThreadedAssociation extends Association implements Runnable {
 
     final static int MAXBLOCKS = 16; // some number....
     private ArrayBlockingQueue<DataChunk> _freeBlocks;
     private Hashtable<Long, DataChunk> _inFlight;
     private long _lastCumuTSNAck;
+
+    // a guess at the round-trip time
+    private long _rto = 200;
 
     /*   
      o  Receiver advertised window size (rwnd, in bytes), which is set by
@@ -89,34 +89,35 @@ public class ThreadedAssociation extends Association {
     private long _partial_bytes_acked;
     private boolean _fastRecovery;
     /*
-    10.2.  Probing Method Using SCTP
+     10.2.  Probing Method Using SCTP
 
-   In the Stream Control Transmission Protocol (SCTP) [RFC2960], the
-   application writes messages to SCTP, which divides the data into
-   smaller "chunks" suitable for transmission through the network.  Each
-   chunk is assigned a Transmission Sequence Number (TSN).  Once a TSN
-   has been transmitted, SCTP cannot change the chunk size.  SCTP multi-
-   path support normally requires SCTP to choose a chunk size such that
-   its messages to fit the smallest PMTU of all paths.  Although not
-   required, implementations may bundle multiple data chunks together to
-   make larger IP packets to send on paths with a larger PMTU.  Note
-   that SCTP must independently probe the PMTU on each path to the peer.
+     In the Stream Control Transmission Protocol (SCTP) [RFC2960], the
+     application writes messages to SCTP, which divides the data into
+     smaller "chunks" suitable for transmission through the network.  Each
+     chunk is assigned a Transmission Sequence Number (TSN).  Once a TSN
+     has been transmitted, SCTP cannot change the chunk size.  SCTP multi-
+     path support normally requires SCTP to choose a chunk size such that
+     its messages to fit the smallest PMTU of all paths.  Although not
+     required, implementations may bundle multiple data chunks together to
+     make larger IP packets to send on paths with a larger PMTU.  Note
+     that SCTP must independently probe the PMTU on each path to the peer.
 
-   The RECOMMENDED method for generating probes is to add a chunk
-   consisting only of padding to an SCTP message.  The PAD chunk defined
-   in [RFC4820] SHOULD be attached to a minimum length HEARTBEAT (HB)
-   chunk to build a probe packet.  This method is fully compatible with
-   all current SCTP implementations.
+     The RECOMMENDED method for generating probes is to add a chunk
+     consisting only of padding to an SCTP message.  The PAD chunk defined
+     in [RFC4820] SHOULD be attached to a minimum length HEARTBEAT (HB)
+     chunk to build a probe packet.  This method is fully compatible with
+     all current SCTP implementations.
 
-   SCTP MAY also probe with a method similar to TCP's described above,
-   using inline data.  Using such a method has the advantage that
-   successful probes have no additional overhead; however, failed probes
-   will require retransmission of data, which may impact flow
-   performance.
+     SCTP MAY also probe with a method similar to TCP's described above,
+     using inline data.  Using such a method has the advantage that
+     successful probes have no additional overhead; however, failed probes
+     will require retransmission of data, which may impact flow
+     performance.
 
-To do .....
-    */
+     To do .....
+     */
     private int _transpMTU = 768;
+    private final SimpleSCTPTimer _timer;
 
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
         super(transport, al);
@@ -133,17 +134,26 @@ To do .....
         } catch (IOException ex) {
             ;
         }
+        _timer = new SimpleSCTPTimer();
+
     }
 
     public SCTPStream mkStream(int id) {
         return new BlockingSCTPStream(this, id);
     }
 
+    public long getT3() {
+        return this._rto * 2; // todo - proper estimate 
+    }
+
     @Override
     public void enqueue(DataChunk d) {
         synchronized (this) {
+            long now = System.currentTimeMillis();
             d.setTsn(_nearTSN++);
             d.setGapAck(false);
+            d.setRetryTime(now + getT3()-1);
+            _timer.setRunnable(this, getT3());
             reduceRwnd(d.getDataSize());
             //_outbound.put(new Long(d.getTsn()), d);
             Log.verb(" DataChunk enqueued " + d.toString());
@@ -159,11 +169,6 @@ To do .....
                 Log.error("Can not send chunk " + d.toString());
             }
         }
-    }
-
-    @Override
-    public SCTPTimer mkTimer() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 
     @Override
@@ -394,7 +399,6 @@ To do .....
         } else {
             Log.debug("Dumping Sack - already seen later sack.");
         }
-
         return ret;
     }
 
@@ -457,7 +461,6 @@ To do .....
      path MTU.  This upper bound protects against the ACK-Splitting
      attack outlined in [SAVAGE99].
      */
-    
     void adjustCwind(boolean didAdvance, int inFlightBytes, int totalAcked) {
         boolean fullyUtilized = ((inFlightBytes - _cwnd) < DataChunk.getCapacity()); // could we fit one more in?
 
@@ -475,50 +478,50 @@ To do .....
 
         } else {
             /*
-            7.2.2.  Congestion Avoidance
+             7.2.2.  Congestion Avoidance
 
-   When cwnd is greater than ssthresh, cwnd should be incremented by
-   1*MTU per RTT if the sender has cwnd or more bytes of data
-   outstanding for the corresponding transport address.
+             When cwnd is greater than ssthresh, cwnd should be incremented by
+             1*MTU per RTT if the sender has cwnd or more bytes of data
+             outstanding for the corresponding transport address.
 
-   In practice, an implementation can achieve this goal in the following
-   way:
+             In practice, an implementation can achieve this goal in the following
+             way:
 
-   o  partial_bytes_acked is initialized to 0.
+             o  partial_bytes_acked is initialized to 0.
 
-   o  Whenever cwnd is greater than ssthresh, upon each SACK arrival
-      that advances the Cumulative TSN Ack Point, increase
-      partial_bytes_acked by the total number of bytes of all new chunks
-      acknowledged in that SACK including chunks acknowledged by the new
-      Cumulative TSN Ack and by Gap Ack Blocks.
+             o  Whenever cwnd is greater than ssthresh, upon each SACK arrival
+             that advances the Cumulative TSN Ack Point, increase
+             partial_bytes_acked by the total number of bytes of all new chunks
+             acknowledged in that SACK including chunks acknowledged by the new
+             Cumulative TSN Ack and by Gap Ack Blocks.
 
-   o  When partial_bytes_acked is equal to or greater than cwnd and
-      before the arrival of the SACK the sender had cwnd or more bytes
-      of data outstanding (i.e., before arrival of the SACK, flightsize
-      was greater than or equal to cwnd), increase cwnd by MTU, and
-      reset partial_bytes_acked to (partial_bytes_acked - cwnd).
+             o  When partial_bytes_acked is equal to or greater than cwnd and
+             before the arrival of the SACK the sender had cwnd or more bytes
+             of data outstanding (i.e., before arrival of the SACK, flightsize
+             was greater than or equal to cwnd), increase cwnd by MTU, and
+             reset partial_bytes_acked to (partial_bytes_acked - cwnd).
 
-   o  Same as in the slow start, when the sender does not transmit DATA
-      on a given transport address, the cwnd of the transport address
-      should be adjusted to max(cwnd / 2, 4*MTU) per RTO.
-
-
+             o  Same as in the slow start, when the sender does not transmit DATA
+             on a given transport address, the cwnd of the transport address
+             should be adjusted to max(cwnd / 2, 4*MTU) per RTO.
 
 
 
-Stewart                     Standards Track                    [Page 97]
+
+
+             Stewart                     Standards Track                    [Page 97]
 
-RFC 4960          Stream Control Transmission Protocol    September 2007
+             RFC 4960          Stream Control Transmission Protocol    September 2007
 
 
-   o  When all of the data transmitted by the sender has been
-      acknowledged by the receiver, partial_bytes_acked is initialized
-      to 0.
+             o  When all of the data transmitted by the sender has been
+             acknowledged by the receiver, partial_bytes_acked is initialized
+             to 0.
 
-            */
-            if (didAdvance){
+             */
+            if (didAdvance) {
                 _partial_bytes_acked += totalAcked;
-                if ((_partial_bytes_acked >= _cwnd)&& fullyUtilized){
+                if ((_partial_bytes_acked >= _cwnd) && fullyUtilized) {
                     _cwnd += _transpMTU;
                     _partial_bytes_acked -= _cwnd;
                 }
@@ -560,5 +563,35 @@ RFC 4960          Stream Control Transmission Protocol    September 2007
 
      */
 
+    // timer goes off,
+    @Override
+    public void run() {
+        Log.debug("retry timer went off");
+        long now = System.currentTimeMillis();
+        ArrayList<DataChunk> dcs = new ArrayList();
+        for (Long k : _inFlight.keySet()) {
+            int space = _transpMTU; 
+            DataChunk d = _inFlight.get(k);
+            if (d.getRetryTime() >= now) {
+                dcs.add(d);
+                d.setRetryTime(now+getT3()-1);
+                space -= d.getChunkLength();
+                Log.debug("available space in pkt is "+space);
+                if (space <=0 ) break;
+            }
+        }
+        if (!dcs.isEmpty()){
+            DataChunk[] da = (DataChunk[]) dcs.toArray();
+            _timer.setRunnable(this, getT3());
+            try {
+                Log.debug("Sending retry for  "+ da.length + " data chunks");
+                this.send(da);
+            } catch (Exception ex) {
+                Log.error("Cant send retry - eek "+ ex.toString());
+            }
+        } else {
+            Log.debug("Nothing to do ");
+        }
+    }
 
 }
