@@ -30,6 +30,7 @@ import com.phono.srtplight.Log;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Hashtable;
 import java.util.concurrent.ArrayBlockingQueue;
 import org.bouncycastle.crypto.tls.DatagramTransport;
@@ -43,7 +44,7 @@ public class ThreadedAssociation extends Association implements Runnable {
 
     final static int MAXBLOCKS = 16; // some number....
     private ArrayBlockingQueue<DataChunk> _freeBlocks;
-    private Hashtable<Long, DataChunk> _inFlight;
+    private HashMap<Long, DataChunk> _inFlight;
     private long _lastCumuTSNAck;
 
     // a guess at the round-trip time
@@ -123,7 +124,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
         super(transport, al);
         _freeBlocks = new ArrayBlockingQueue(MAXBLOCKS);
-        _inFlight = new Hashtable(MAXBLOCKS);
+        _inFlight = new HashMap(MAXBLOCKS);
 
         for (int i = 0; i < MAXBLOCKS; i++) {
             DataChunk dc = new DataChunk();
@@ -140,7 +141,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     }
 
     public SCTPStream mkStream(int id) {
-        Log.debug("Make new Blocking stream "+id);
+        Log.debug("Make new Blocking stream " + id);
         return new BlockingSCTPStream(this, id);
     }
 
@@ -150,11 +151,12 @@ public class ThreadedAssociation extends Association implements Runnable {
 
     @Override
     public void enqueue(DataChunk d) {
+        // todo - this worries me - 2 nested synchronized 
         synchronized (this) {
             long now = System.currentTimeMillis();
             d.setTsn(_nearTSN++);
             d.setGapAck(false);
-            d.setRetryTime(now + getT3()-1);
+            d.setRetryTime(now + getT3() - 1);
             _timer.setRunnable(this, getT3());
             reduceRwnd(d.getDataSize());
             //_outbound.put(new Long(d.getTsn()), d);
@@ -164,7 +166,9 @@ public class ThreadedAssociation extends Association implements Runnable {
             Chunk[] toSend = addSackIfNeeded(d);
             try {
                 send(toSend);
-                _inFlight.put(new Long(d.getTsn()), d);
+                synchronized (_inFlight) {
+                    _inFlight.put(new Long(d.getTsn()), d);
+                }
             } catch (SctpPacketFormatException ex) {
                 Log.error("badly formatted chunk " + d.toString());
             } catch (IOException ex) {
@@ -334,7 +338,7 @@ public class ThreadedAssociation extends Association implements Runnable {
 
             // interesting SACK
             // process acks
-            synchronized (this) {
+            synchronized (_inFlight) {
                 ArrayList<Long> removals = new ArrayList();
                 for (Long k : _inFlight.keySet()) {
                     if (k <= ackedTo) {
@@ -366,16 +370,18 @@ public class ThreadedAssociation extends Association implements Runnable {
             for (SackChunk.GapBlock gb : sack.getGaps()) {
                 long ts = gb.getStart() + ackedTo;
                 long te = gb.getEnd() + ackedTo;
-                for (long t = ts; t <= te; t++) {
-                    Long l = new Long(t);
-                    DataChunk d = _inFlight.get(l);
-                    Log.verb("gap block says far end has seen " + l);
+                synchronized (_inFlight) {
+                    for (long t = ts; t <= te; t++) {
+                        Long l = new Long(t);
+                        DataChunk d = _inFlight.get(l);
+                        Log.verb("gap block says far end has seen " + l);
 
-                    if (d == null) {
-                        Log.debug("Huh? gap for something not inFlight ?!? " + l);
-                    } else {
-                        d.setGapAck(true);
-                        totalAcked += d.getDataSize();
+                        if (d == null) {
+                            Log.debug("Huh? gap for something not inFlight ?!? " + l);
+                        } else {
+                            d.setGapAck(true);
+                            totalAcked += d.getDataSize();
+                        }
                     }
                 }
             }
@@ -385,10 +391,12 @@ public class ThreadedAssociation extends Association implements Runnable {
              TSN Ack and the Gap Ack Blocks.
              */
             int totalDataInFlight = 0;
-            for (Long k : _inFlight.keySet()) {
-                DataChunk d = _inFlight.get(k);
-                if (!d.getGapAck()) {
-                    totalDataInFlight += d.getDataSize();
+            synchronized (_inFlight) {
+                for (Long k : _inFlight.keySet()) {
+                    DataChunk d = _inFlight.get(k);
+                    if (!d.getGapAck()) {
+                        totalDataInFlight += d.getDataSize();
+                    }
                 }
             }
             _rwnd = sack.getArWin() - totalDataInFlight;
@@ -567,42 +575,57 @@ public class ThreadedAssociation extends Association implements Runnable {
     // timer goes off,
     @Override
     public void run() {
-        Log.debug("retry timer went off");
         long now = System.currentTimeMillis();
+        Log.debug("retry timer went off at " + now);
         ArrayList<DataChunk> dcs = new ArrayList();
-        int space = _transpMTU; 
-        for (Long k : _inFlight.keySet()) {
-            DataChunk d = _inFlight.get(k);
-            if (d.getGapAck()) {
-                Log.debug("skipping gap-acked tsn "+d.getTsn());
-                continue;
-            }
-            if (d.getRetryTime() >= now) {
-                dcs.add(d);
-                d.setRetryTime(now+getT3()-1);
-                space -= d.getChunkLength();
-                Log.debug("available space in pkt is "+space);
-                if (space <=0 ) break;
+        int space = _transpMTU;
+        boolean resetTimer = false;
+        synchronized (_inFlight) {
+            for (Long k : _inFlight.keySet()) {
+                DataChunk d = _inFlight.get(k);
+                if (d.getGapAck()) {
+                    Log.debug("skipping gap-acked tsn " + d.getTsn());
+                    continue;
+                }
+                if (d.getRetryTime() <= now) {
+                    dcs.add(d);
+                    d.setRetryTime(now + getT3() - 1);
+                    space -= d.getChunkLength();
+                    Log.debug("available space in pkt is " + space);
+                    if (space <= 0) {
+                        resetTimer = true;
+                        break;
+                    }
+                } else {
+                    Log.debug("retry not yet due for  " + d.toString());
+                    resetTimer = true;
+                }
             }
         }
-        if (!dcs.isEmpty()){
+        if (!dcs.isEmpty()) {
             Comparator<? super DataChunk> dcc = dcs.get(0);
             dcs.sort(dcc);
             DataChunk[] da = new DataChunk[dcs.size()];
-            int i=0;
-            for (DataChunk d:dcs){
+            int i = 0;
+            for (DataChunk d : dcs) {
                 da[i++] = d;
             }
-            _timer.setRunnable(this, getT3());
+            resetTimer = true;
             try {
-                Log.debug("Sending retry for  "+ da.length + " data chunks");
+                Log.debug("Sending retry for  " + da.length + " data chunks");
                 this.send(da);
             } catch (Exception ex) {
-                Log.error("Cant send retry - eek "+ ex.toString());
+                Log.error("Cant send retry - eek " + ex.toString());
             }
         } else {
             Log.debug("Nothing to do ");
         }
+        if (resetTimer) {
+            _timer.setRunnable(this, getT3());
+            Log.debug("Try again in a while  ");
+
+        }
+
     }
 
 }

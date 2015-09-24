@@ -262,7 +262,8 @@ public class DataChunk extends Chunk implements Comparator {
 
     public String toString() {
         String ret = super.toString();
-        ret += " ppid = " + _ppid + "seqn " + _sSeqNo + " streamId " + _streamId + " tsn " + _tsn + " body " + getDataAsString();
+        ret += " ppid = " + _ppid + "seqn " + _sSeqNo + " streamId " + _streamId + " tsn " + _tsn 
+            + " retry "+_retryTime+" gap acked "+_gapAck+" body " + getDataAsString();
         return ret;
     }
 
