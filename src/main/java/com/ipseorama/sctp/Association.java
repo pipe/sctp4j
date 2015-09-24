@@ -435,9 +435,11 @@ abstract public class Association {
         Long tsn_L = new Long(tsn);
         if (tsn > _farTSN) {
             // put it in the pen.
-            DataChunk dup = _holdingPen.putIfAbsent(tsn_L, dc);
+            DataChunk dup = _holdingPen.get(tsn_L) ;
             if (dup!=null){
                 duplicates.add(tsn_L);
+            } else {
+                _holdingPen.put(tsn_L, dc);
             }
             // now see if we can deliver anything new to the streams
             boolean gap = false;
