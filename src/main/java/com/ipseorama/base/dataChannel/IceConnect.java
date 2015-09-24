@@ -26,6 +26,7 @@ import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
+import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.ice4j.ice.Candidate;
 import org.ice4j.ice.CandidatePair;
 import org.ice4j.ice.CandidateType;
@@ -157,6 +158,10 @@ public class IceConnect implements PropertyChangeListener {
         return ret;
     }
 
+    public DatagramTransport mkTransport(DatagramSocket lds, TransportAddress rta) {
+        return new QueuingDatagramTransport(lds, rta);
+    }
+
     @Override
     public void propertyChange(PropertyChangeEvent evt) {
         Log.debug("got PCE evt on " + evt.getPropertyName() + " value is now " + evt.getNewValue());
@@ -188,7 +193,7 @@ public class IceConnect implements PropertyChangeListener {
                         }
 
                         try {
-                            QueuingDatagramTransport ds = new QueuingDatagramTransport(lds, rta);
+                            DatagramTransport ds = mkTransport(lds, rta);
                             _dtls = new DTLSServer(_cert, ds, _al, _ffp);
                         } catch (Exception ex) {
                             Log.debug("DTLS exception");
@@ -224,7 +229,7 @@ public class IceConnect implements PropertyChangeListener {
 
         // STUN
         StunCandidateHarvester stunHarv = new StunCandidateHarvester(
-         new TransportAddress("stun.l.google.com", 19302, Transport.UDP));
+                new TransportAddress("stun.l.google.com", 19302, Transport.UDP));
 
         agent.addCandidateHarvester(stunHarv);
         // TURN

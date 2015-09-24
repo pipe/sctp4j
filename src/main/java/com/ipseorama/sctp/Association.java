@@ -31,9 +31,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 
 /**
@@ -134,7 +136,7 @@ abstract public class Association {
     private final AssociationListener _al;
     private HashMap<Long, DataChunk> _outbound;
     private State _state;
-    private  HashMap<Long, DataChunk> _holdingPen ;
+    private HashMap<Long, DataChunk> _holdingPen;
 
     ;
 
@@ -370,7 +372,7 @@ abstract public class Association {
         Chunk[] reply = null;
         _peerVerTag = init.getInitiateTag();
         _winCredit = init.getAdRecWinCredit();
-        _farTSN = init.getInitialTSN();
+        _farTSN = init.getInitialTSN()-1;
         _nearTSN = _random.nextInt(Integer.MAX_VALUE);
         _maxOutStreams = Math.min(init.getNumInStreams(), MAXSTREAMS);
         _maxInStreams = Math.min(init.getNumOutStreams(), MAXSTREAMS);
@@ -397,6 +399,8 @@ abstract public class Association {
     }
 
     private void ingest(DataChunk dc, ArrayList<Chunk> rep) {
+        Log.verb("ingesting " + dc.toString());
+
         Integer sno = dc.getStreamId();
         long tsn = dc.getTsn();
         SCTPStream in = _streams.get(sno);
@@ -410,7 +414,6 @@ abstract public class Association {
             if (_al != null) {
                 _al.onStream(in);
             }
-
         } else {
             repa = in.append(dc);
         }
@@ -425,45 +428,39 @@ abstract public class Association {
 
     private Chunk[] dataDeal(DataChunk dc) {
         ArrayList<Chunk> rep = new ArrayList();
+        ArrayList<Long> duplicates = new ArrayList();
+
         Chunk dummy[] = new Chunk[0];
         long tsn = dc.getTsn();
-
+        Long tsn_L = new Long(tsn);
         if (tsn > _farTSN) {
-            // progress at least
-            // look for cached entries in the holding pen
-            
-//NOTE - strategy here should be :
-            // 1) put this one in teh holding pen
-            // 2) iterate from _farTSN upwards
-            // 3)  looking for holding pen items that match
-            // 4)  ingest them and remove from pen
-            // 5) until we hit a gap.
-            
-            boolean hole = false;
-            for (long t = _farTSN+1 ; t< tsn; t++){
+            // put it in the pen.
+            DataChunk dup = _holdingPen.putIfAbsent(tsn_L, dc);
+            if (dup!=null){
+                duplicates.add(tsn_L);
+            }
+            // now see if we can deliver anything new to the streams
+            boolean gap = false;
+            for (long t = _farTSN + 1; !gap; t++) {
                 Long l = new Long(t);
                 dc = _holdingPen.remove(l);
-                if (dc != null){
-                    ingest(dc,rep);
+                if (dc != null) {
+                    ingest(dc, rep);
                 } else {
-                    hole = true;
-                    break;
+                    Log.verb("gap in inbound tsns at "+t);
+                    gap = true;
                 }
-            }
-            if (!hole){
-                ingest(dc, rep);
             }
         } else {
             // probably wrong now.. 
-            if (tsn < _farTSN) {
-                Log.warn("Already seen . " + tsn + " expecting " + (_farTSN));
-                // should log as duplicate
-            } else {
-                Log.warn("Not seen " + _farTSN + " yet, so ignoring " + (tsn));
-                _holdingPen.put(new Long(dc.getTsn()),dc);
-            }
+            Log.warn("Already seen . " + tsn + " expecting " + (_farTSN));
+            duplicates.add(tsn_L);
         }
-        SackChunk sack = mkSack();
+        ArrayList<Long> l = new ArrayList();
+        l.addAll(_holdingPen.keySet());
+        Collections.sort(l);
+
+        SackChunk sack = mkSack(l,duplicates);
         rep.add(sack);
         return rep.toArray(dummy);
     }
@@ -570,14 +567,17 @@ abstract public class Association {
         return reply;
     }
 
-    private SackChunk mkSack() {
+    private SackChunk mkSack(ArrayList<Long> pen,ArrayList<Long> dups) {
         // Notice that this is the dumbest possible sack implementation
         // it assumes no gaps, because we ignore unexpected packets in dataDeal()
         // mucho room for improvement....
         SackChunk ret = new SackChunk();
-        ret.setCumuTSNAck(_farTSN - 1); // why ? why not _farTSN ?
+        ret.setCumuTSNAck(_farTSN);
         int stashcap = calcStashCap();
         ret.setArWin(MAXBUFF - stashcap);
+        ret.setGaps(pen);
+        ret.setDuplicates(dups);
+        Log.debug("made SACK " + ret.toString());
         return ret;
     }
 

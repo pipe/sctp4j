@@ -29,6 +29,7 @@ import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
 import com.phono.srtplight.Log;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Hashtable;
 import java.util.concurrent.ArrayBlockingQueue;
 import org.bouncycastle.crypto.tls.DatagramTransport;
@@ -139,6 +140,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     }
 
     public SCTPStream mkStream(int id) {
+        Log.debug("Make new Blocking stream "+id);
         return new BlockingSCTPStream(this, id);
     }
 
@@ -335,9 +337,8 @@ public class ThreadedAssociation extends Association implements Runnable {
             synchronized (this) {
                 ArrayList<Long> removals = new ArrayList();
                 for (Long k : _inFlight.keySet()) {
-                    if (k < ackedTo) {
+                    if (k <= ackedTo) {
                         removals.add(k);
-
                     }
                 }
                 for (Long k : removals) {
@@ -569,9 +570,13 @@ public class ThreadedAssociation extends Association implements Runnable {
         Log.debug("retry timer went off");
         long now = System.currentTimeMillis();
         ArrayList<DataChunk> dcs = new ArrayList();
+        int space = _transpMTU; 
         for (Long k : _inFlight.keySet()) {
-            int space = _transpMTU; 
             DataChunk d = _inFlight.get(k);
+            if (d.getGapAck()) {
+                Log.debug("skipping gap-acked tsn "+d.getTsn());
+                continue;
+            }
             if (d.getRetryTime() >= now) {
                 dcs.add(d);
                 d.setRetryTime(now+getT3()-1);
@@ -581,7 +586,13 @@ public class ThreadedAssociation extends Association implements Runnable {
             }
         }
         if (!dcs.isEmpty()){
-            DataChunk[] da = (DataChunk[]) dcs.toArray();
+            Comparator<? super DataChunk> dcc = dcs.get(0);
+            dcs.sort(dcc);
+            DataChunk[] da = new DataChunk[dcs.size()];
+            int i=0;
+            for (DataChunk d:dcs){
+                da[i++] = d;
+            }
             _timer.setRunnable(this, getT3());
             try {
                 Log.debug("Sending retry for  "+ da.length + " data chunks");

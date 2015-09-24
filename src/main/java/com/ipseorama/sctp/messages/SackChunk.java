@@ -18,6 +18,9 @@
 package com.ipseorama.sctp.messages;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Set;
 
 /**
  *
@@ -83,12 +86,20 @@ public class SackChunk extends Chunk {
      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
      */
 
+
+
     public class GapBlock {
         char _start;
         char _end;
         GapBlock(ByteBuffer b){
             _start = b.getChar();
             _end = b.getChar();
+        }
+        GapBlock(char start){
+            _start = start;
+        }
+        void setEnd(char end){
+            _end = end;
         }
 
         private void put(ByteBuffer b) {
@@ -135,7 +146,44 @@ public class SackChunk extends Chunk {
         _gaps = new GapBlock[0];
         _duplicateTSNs = new long[0];
     }
-
+    
+    public void setDuplicates(ArrayList<Long> dups) {
+        _duplicateTSNs = new long[dups.size()];
+        int i=0;
+        for (Long du:dups){
+            _duplicateTSNs[i++]= du.longValue();
+        }
+    }
+    
+    public void setGaps(ArrayList<Long> seenTsns){
+        long cuTsn = _cumuTSNAck;
+        ArrayList<GapBlock> gaplist = new ArrayList();
+        GapBlock currentGap = null;
+        char prevoff = 0;
+        for(Long t:seenTsns){
+            char offs = (char) (t.longValue() - cuTsn);
+            if (currentGap == null){
+                currentGap = new GapBlock(offs);
+                currentGap.setEnd(offs);
+                gaplist.add(currentGap);
+            } else {
+                if (offs == prevoff +1){
+                    currentGap.setEnd(offs);
+                } else {
+                    currentGap = new GapBlock(offs);
+                    currentGap.setEnd(offs);
+                    gaplist.add(currentGap);
+                }
+            }
+            prevoff = offs;
+        }
+        _gaps = new GapBlock[gaplist.size()];
+        int i=0;
+        for (GapBlock g:gaplist){
+            _gaps[i++] = g;
+        }
+    }
+    
     @Override
     void putFixedParams(ByteBuffer ret) {
         Chunk.putUnsignedInt(ret, _cumuTSNAck);
@@ -146,7 +194,20 @@ public class SackChunk extends Chunk {
             _gaps[i].put(ret);
         }
         for (int i=0;i<_duplicateTSNs.length;i++){
-             Chunk.putUnsignedInt(_body,_duplicateTSNs[i]);
+             Chunk.putUnsignedInt(ret,_duplicateTSNs[i]);
         }
+    }
+    public String toString(){
+        StringBuffer ret= new StringBuffer("SACK cumuTSNAck="+_cumuTSNAck)
+                .append(" _arWin="+_arWin)
+                .append(" _gaps="+_gaps.length+" [");
+                for (GapBlock g:_gaps){
+                    ret.append("\n\t{"+(int)g._start+","+(int)g._end+"}");
+                }
+                ret.append("]\n _duplicateTSNs="+_duplicateTSNs.length);
+                for( long t:_duplicateTSNs){
+                    ret.append("\n\t"+t);
+                }
+        return ret.toString();
     }
 }

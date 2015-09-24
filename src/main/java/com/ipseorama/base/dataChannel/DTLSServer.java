@@ -10,8 +10,6 @@ import com.ipseorama.sctp.AssociationListener;
 import com.ipseorama.sctp.small.ThreadedAssociation;
 import com.phono.srtplight.Log;
 import java.io.IOException;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
 import java.security.SecureRandom;
 import java.util.Hashtable;
 import org.bouncycastle.crypto.tls.Certificate;
@@ -27,7 +25,6 @@ import org.bouncycastle.crypto.tls.ProtocolVersion;
 import org.bouncycastle.crypto.tls.TlsSRTPUtils;
 import org.bouncycastle.crypto.tls.TlsSignerCredentials;
 import org.bouncycastle.crypto.tls.UseSRTPData;
-import org.ice4j.TransportAddress;
 
 /**
  *
@@ -48,7 +45,7 @@ class DTLSServer extends
     private final DatagramTransport _dt;
 
     public DTLSServer(CertHolder cert, DatagramTransport dt, AssociationListener al, String farFingerprint) throws Exception {
-
+        
         _al = al;
         _cert = cert;
         _ffp = farFingerprint;

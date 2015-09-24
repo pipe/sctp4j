@@ -21,12 +21,13 @@ import com.ipseorama.base.dataChannel.DECP.DCOpen;
 import com.ipseorama.sctp.messages.exceptions.InvalidDataChunkException;
 import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
+import java.util.Comparator;
 
 /**
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-public class DataChunk extends Chunk {
+public class DataChunk extends Chunk implements Comparator {
     /*
      +------------------------------------+-----------+-----------+
      | Value                              | SCTP PPID | Reference |
@@ -196,8 +197,14 @@ public class DataChunk extends Chunk {
     }
 
     public int getChunkLength() {
-        return super.getLength();
+        int len = super.getLength();
+        if (len == 0){
+            // ie outbound chunk.
+            len = _dataLength +  12 + 4;
+        }
+        return len;
     }
+    
 
     @Override
     void putFixedParams(ByteBuffer ret) {
@@ -303,4 +310,10 @@ public class DataChunk extends Chunk {
     public long getRetryTime(){
         return _retryTime;
     }
+
+    @Override
+    public int compare(Object o1, Object o2) {
+        return (int) (((DataChunk)o1)._tsn - ((DataChunk)o2)._tsn);
+    }
+        
 }
