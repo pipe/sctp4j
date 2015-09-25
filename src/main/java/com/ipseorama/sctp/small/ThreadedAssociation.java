@@ -29,6 +29,7 @@ import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
 import com.phono.srtplight.Log;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -603,7 +604,7 @@ public class ThreadedAssociation extends Association implements Runnable {
         }
         if (!dcs.isEmpty()) {
             Comparator<? super DataChunk> dcc = dcs.get(0);
-            dcs.sort(dcc);
+            Collections.sort(dcs, dcc);
             DataChunk[] da = new DataChunk[dcs.size()];
             int i = 0;
             for (DataChunk d : dcs) {

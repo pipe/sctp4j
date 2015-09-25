@@ -19,6 +19,7 @@
 package com.ipseorama.sctp.small;
 
 import com.ipseorama.sctp.SCTPTimer;
+import com.phono.srtplight.Log;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -29,7 +30,7 @@ import java.util.TimerTask;
  * runnable to decide if something needs to be done or not.
  */
 class SimpleSCTPTimer implements SCTPTimer {
-    private final Timer _timer;
+    private Timer _timer;
 
     public SimpleSCTPTimer() {
         _timer = new Timer();        
@@ -44,7 +45,13 @@ class SimpleSCTPTimer implements SCTPTimer {
                 torun.run();
             }         
         };
-        _timer.schedule(tick, at);
+        try {
+            _timer.schedule(tick, at);
+        } catch (IllegalStateException x) {
+            Log.warn("Stupid Java7 timer died with "+x.getMessage()+" creating a new one");
+            _timer = new Timer();
+            _timer.schedule(tick, at);
+        }
     }
     
 }
