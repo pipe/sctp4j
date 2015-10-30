@@ -134,7 +134,7 @@ public class IceConnect implements PropertyChangeListener {
         return ret;
     }
 
-    void setFarFingerprint(String ffp) {
+    protected void setFarFingerprint(String ffp) {
         _ffp = ffp;
     }
 

@@ -84,7 +84,10 @@ public class IceConnectJSON extends IceConnect {
                 _mid = ((JsonObject) content).getString("mid","data");
             }
         }
-
+        String fp = this.getFarFingerprint();
+        if( fp == null){
+            throw new IOException("No fingerptint set");
+        }
     }
 
     public JsonArrayBuilder mkCandidates() {
