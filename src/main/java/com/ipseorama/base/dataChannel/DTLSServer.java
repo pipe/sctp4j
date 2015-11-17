@@ -5,6 +5,7 @@
  */
 package com.ipseorama.base.dataChannel;
 
+import com.ipseorama.base.certHolders.CertHolder;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.AssociationListener;
 import com.ipseorama.sctp.small.ThreadedAssociation;

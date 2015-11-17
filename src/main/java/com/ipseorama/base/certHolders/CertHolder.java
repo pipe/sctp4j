@@ -3,7 +3,7 @@
  * To change this template file, choose Tools | Templates
  * and open the template in the editor.
  */
-package com.ipseorama.base.dataChannel;
+package com.ipseorama.base.certHolders;
 
 import com.phono.srtplight.Log;
 import java.io.FileNotFoundException;
@@ -23,10 +23,10 @@ import org.bouncycastle.crypto.util.PrivateKeyFactory;
  *
  * @author tim
  */
-public class CertHolder {
+public abstract class CertHolder {
 
-    static private Certificate _cert;
-    static private AsymmetricKeyParameter _key;
+    static protected Certificate _cert;
+    static protected AsymmetricKeyParameter _key;
 
     public CertHolder() throws UnrecoverableEntryException, KeyStoreException, IOException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
         if ((_key == null) || (_cert == null)) {
@@ -35,51 +35,16 @@ public class CertHolder {
         }
     }
 
-    private void loadKeyNCert() throws KeyStoreException, FileNotFoundException, IOException, NoSuchAlgorithmException, CertificateException, UnrecoverableEntryException {
-        KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
-
-        // get user password and file input stream
-        char[] password = {'y', 'e', 'e', 'h', 'a', 'a'};
-
-        java.io.FileInputStream fis = null;
-        try {
-            fis = new java.io.FileInputStream("/project2/westhawk/keys/wildcard/wildwesthawk.ks");
-            ks.load(fis, password);
-            Key k = ks.getKey("wildwest", password);
-            _key = PrivateKeyFactory.createKey(k.getEncoded());
-            java.security.cert.Certificate cert[] = ks.getCertificateChain("wildwest");
-            org.bouncycastle.asn1.x509.Certificate carry[] = new org.bouncycastle.asn1.x509.Certificate[cert.length];
-            int n = 0;
-            for (java.security.cert.Certificate c : cert) {
-                carry[n++] = org.bouncycastle.asn1.x509.Certificate.getInstance(c.getEncoded());
-            }
-            _cert = new Certificate(carry);
-        } finally {
-            if (fis != null) {
-                fis.close();
-            }
-        }
-    }
-
-    Certificate getCert() {
+    protected abstract void loadKeyNCert() throws KeyStoreException, FileNotFoundException, IOException, NoSuchAlgorithmException, CertificateException, UnrecoverableEntryException ;
+    public Certificate getCert() {
         return this._cert;
     }
 
-    AsymmetricKeyParameter getKey() {
+    public AsymmetricKeyParameter getKey() {
         return this._key;
     }
 
-    public static void main(String argv[]) {
-        try {
-            Log.setLevel(Log.DEBUG);
-            CertHolder s = new CertHolder();
-            Log.debug("fingerprint is " + s.getPrint());
-            Log.debug("fingerprint is " + s.getPrint(false));
 
-        } catch (Exception ex) {
-            Log.error(ex.toString());
-        }
-    }
     public String getPrint() throws IOException {
         return getPrint(true);
     }

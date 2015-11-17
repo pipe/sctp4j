@@ -5,6 +5,8 @@
  */
 package com.ipseorama.base.dataChannel;
 
+import com.ipseorama.base.certHolders.CertHolder;
+import com.ipseorama.base.certHolders.JksCertHolder;
 import com.ipseorama.sctp.AssociationListener;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
@@ -54,7 +56,7 @@ public class IceConnect implements PropertyChangeListener {
     }
 
     IceConnect(int port) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
-        _cert = new CertHolder();
+        _cert = new JksCertHolder();
         _ffp = null;
         _localAgent = createAgent(false);
         _localAgent.addStateChangeListener(this);
