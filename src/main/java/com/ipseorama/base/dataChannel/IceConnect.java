@@ -49,7 +49,8 @@ public class IceConnect implements PropertyChangeListener {
     private AssociationListener _al;
     private String _ffp;
     public Runnable cleanup;
-    private DTLSServer _dtls;
+    private DTLSEndpoint _dtls;
+    protected boolean _dtlsClientRole = true;
 
     public void setAssociationListener(AssociationListener al) {
         this._al = al;
@@ -67,7 +68,7 @@ public class IceConnect implements PropertyChangeListener {
                 NominationStrategy.NOMINATE_FIRST_VALID);
 
         //let them fight ... fights forge character.
-        _localAgent.setControlling(false);
+        _localAgent.setControlling(_dtlsClientRole);
 
         //STREAMS
         createStream(port, "data", _localAgent);
@@ -196,10 +197,17 @@ public class IceConnect implements PropertyChangeListener {
 
                         try {
                             DatagramTransport ds = mkTransport(lds, rta);
-                            _dtls = new DTLSServer(_cert, ds, _al, _ffp);
+                            Log.debug("DTLS role " + (_dtlsClientRole ? "client" : "server"));
+
+                            if (_dtlsClientRole) {
+                                _dtls = new DTLSClient(_cert, ds, _al, _ffp);
+                            } else {
+                                _dtls = new DTLSServer(_cert, ds, _al, _ffp);
+                            }
                         } catch (Exception ex) {
                             Log.debug("DTLS exception");
                             Log.error(ex.toString());
+                            ex.printStackTrace();
                         }
 
                     }

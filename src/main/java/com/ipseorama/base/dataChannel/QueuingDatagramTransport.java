@@ -12,8 +12,6 @@ import java.net.DatagramSocket;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.ice4j.TransportAddress;
 
 /**

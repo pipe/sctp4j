@@ -37,19 +37,39 @@ import org.ice4j.ice.Candidate;
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
 public class IceConnectJSON extends IceConnect {
-    private String _session,_to,_type,_mid;
+
+    private String _session, _to, _type, _mid;
 
     public IceConnectJSON(int port) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
         super(port);
     }
 
     public void setOffer(JsonObject message) throws IOException {
+        String offer = message.getString("type");
+        if (!"offer".equalsIgnoreCase(offer)){
+            throw new java.io.IOException("we expected an offer, got: "+offer);
+        }
+        setSDP(message);
+
+    }
+    public void setAnswer(JsonObject message) throws IOException {
+        String answer = message.getString("type");
+        String session = message.getString("session");
+        if (!_session.equalsIgnoreCase(session)){
+            throw new java.io.IOException("session mixup, expected : "+_session);
+        }
+        if (!"answer".equalsIgnoreCase(answer)){
+            throw new java.io.IOException("we expected an answer, got: "+answer);
+        }
+        setSDP(message);
+    }
+    public void setSDP(JsonObject message) throws IOException {
         // honestly - you look at this and you just wish for groovy or xpath to write this in a declarative way.
         JsonObject sdpo = message.getJsonObject("sdp");
         _session = message.getString("session");
         _to = message.getString("to");
         _type = message.getString("type");
-        
+
         JsonArray contents = sdpo.getJsonArray("contents");
         for (JsonValue content : contents) {
             JsonObject fpo = ((JsonObject) content).getJsonObject("fingerprint");
@@ -60,10 +80,14 @@ public class IceConnectJSON extends IceConnect {
             JsonObject media = ((JsonObject) content).getJsonObject("media");
 
             String proto = media.getString("proto");
+            _mid = ((JsonObject) content).getString("mid", "data");
+            String setup = ((JsonObject) content).getString("setup","unknown");
+            _dtlsClientRole = true; //"active".equalsIgnoreCase(setup);
             if ("DTLS/SCTP".equals(proto)) {
                 JsonObject ice = ((JsonObject) content).getJsonObject("ice");
                 String ufrag = ice.getString("ufrag");
                 String pass = ice.getString("pwd");
+                
                 try {
                     buildIce(ufrag, pass);
                     try {
@@ -81,11 +105,10 @@ public class IceConnectJSON extends IceConnect {
                     JsonObject jcandy = (JsonObject) v_candy;
                     addCandidate(jcandy.getString("foundation"), jcandy.getString("component"), jcandy.getString("protocol"), jcandy.getString("priority"), jcandy.getString("ip"), jcandy.getString("port"), jcandy.getString("type"));
                 }
-                _mid = ((JsonObject) content).getString("mid","data");
             }
         }
         String fp = this.getFarFingerprint();
-        if( fp == null){
+        if (fp == null) {
             throw new IOException("No fingerptint set");
         }
     }
@@ -108,14 +131,19 @@ public class IceConnectJSON extends IceConnect {
         }
         return ret;
     }
-
     public JsonObject mkAnswer() {
-        String farPrint = getFarFingerprint().replaceAll(":","");
-        Log.debug("farprint is "+farPrint);
+        return mkSDP("answer","passive");
+    }
+    public JsonObject mkOffer() {
+        return mkSDP("offer","actpass");
+    }
+    public JsonObject mkSDP(String type,String setup) {
+        String farPrint = getFarFingerprint().replaceAll(":", "");
+        Log.debug("farprint is " + farPrint);
         JsonObject ans = Json.createObjectBuilder()
                 .add("to", farPrint)
-                .add("type", "answer")
-                .add("session",_session)
+                .add("type", type)
+                .add("session", _session)
                 .add("sdp", Json.createObjectBuilder()
                         .add("contents", Json.createArrayBuilder()
                                 .add(Json.createObjectBuilder()
@@ -145,12 +173,12 @@ public class IceConnectJSON extends IceConnect {
                                                 .add("required", "1")
                                         )
                                         .add("mid", _mid)
-                                        .add("setup", "passive")
+                                        .add("setup", this._dtlsClientRole?"active":"passive")
                                         .add("sctpmap", Json.createArrayBuilder()
                                                 .add(Json.createObjectBuilder()
-                                                    .add("port",5000)
-                                                    .add("app","webrtc-datachannel")
-                                                    .add("count",256)
+                                                        .add("port", 5000)
+                                                        .add("app", "webrtc-datachannel")
+                                                        .add("count", 256)
                                                 )
                                         )
                                 )
@@ -169,6 +197,7 @@ public class IceConnectJSON extends IceConnect {
                  .add("contents", Json.createArrayBuilder().add("data"))
                  )*/
                 .build();
+        Log.verb("Sending" + ans.toString());
         return ans;
         //{"contents":[
         //{"candidates":[]

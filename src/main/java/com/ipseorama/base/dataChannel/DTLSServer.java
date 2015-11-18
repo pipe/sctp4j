@@ -32,7 +32,7 @@ import org.bouncycastle.crypto.tls.UseSRTPData;
  * @author tim
  */
 class DTLSServer extends
-        DefaultTlsServer implements  Runnable {
+        DefaultTlsServer implements  Runnable, DTLSEndpoint {
 
 
     private DTLSServerProtocol _serverProtocol;
@@ -45,7 +45,7 @@ class DTLSServer extends
     private Object nap;
     private final DatagramTransport _dt;
 
-    public DTLSServer(CertHolder cert, DatagramTransport dt, AssociationListener al, String farFingerprint) throws Exception {
+    public DTLSServer(CertHolder cert, DatagramTransport dt, AssociationListener al, String farFingerprint)  throws Exception {
         
         _al = al;
         _cert = cert;
