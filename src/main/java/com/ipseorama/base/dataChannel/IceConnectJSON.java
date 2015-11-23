@@ -82,7 +82,7 @@ public class IceConnectJSON extends IceConnect {
             String proto = media.getString("proto");
             _mid = ((JsonObject) content).getString("mid", "data");
             String setup = ((JsonObject) content).getString("setup","unknown");
-            _dtlsClientRole = true; //"active".equalsIgnoreCase(setup);
+            _dtlsClientRole = "active".equalsIgnoreCase(setup) || "actpass".equalsIgnoreCase(setup);
             if ("DTLS/SCTP".equals(proto)) {
                 JsonObject ice = ((JsonObject) content).getJsonObject("ice");
                 String ufrag = ice.getString("ufrag");

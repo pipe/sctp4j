@@ -18,6 +18,7 @@ import org.bouncycastle.crypto.tls.CipherSuite;
 import org.bouncycastle.crypto.tls.DTLSClientProtocol;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.bouncycastle.crypto.tls.DefaultTlsSignerCredentials;
+import org.bouncycastle.crypto.tls.ProtocolVersion;
 import org.bouncycastle.crypto.tls.TlsAuthentication;
 import org.bouncycastle.crypto.tls.TlsCredentials;
 
@@ -34,6 +35,21 @@ class DTLSClient extends
     private boolean _verified = false;
     private Thread _client;
     private final DatagramTransport _dt;
+    private final static int[] suites = {
+        /*CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+        CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256,
+        CipherSuite.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+        CipherSuite.TLS_RSA_WITH_AES_128_GCM_SHA256,
+        CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA256,
+        CipherSuite.TLS_RSA_WITH_AES_128_CBC_SHA */
+    CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+     CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,// (0xc00a)
+     CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,// (0xc014)
+     CipherSuite.TLS_DHE_RSA_WITH_AES_256_CBC_SHA,// (0x0039)
+     CipherSuite.TLS_RSA_WITH_AES_256_CBC_SHA,// (0x0035)
+     CipherSuite.TLS_RSA_WITH_3DES_EDE_CBC_SHA,// (0x000a)
+     CipherSuite.TLS_EMPTY_RENEGOTIATION_INFO_SCSV
+    };
 
     public DTLSClient(CertHolder cert, DatagramTransport dt, AssociationListener al, String farFingerprint) throws Exception {
 
@@ -44,6 +60,17 @@ class DTLSClient extends
         _client = new Thread(this);
         _client.setName("DTLSlient");
         _client.start();
+
+    }
+
+    @Override
+    public ProtocolVersion getClientVersion() {
+        return ProtocolVersion.DTLSv12;
+    }
+
+    @Override
+    public ProtocolVersion getMinimumVersion() {
+        return ProtocolVersion.DTLSv10;
     }
 
     public void run() {
@@ -57,10 +84,11 @@ class DTLSClient extends
             Log.debug("DTLS client connected. verified = " + _verified);
             if (_verified) {
                 Association a = new ThreadedAssociation(dtls, _al); // todo - association listener api is wrong.
+                Log.debug("Association = " + a.toString());
             } else {
                 Log.error("Not the client fingerprint we were looking for (waves hand)");
             }
-            
+
         } catch (IOException ex) {
             Log.error("dtls client failed " + ex.toString());
             ex.printStackTrace();
@@ -75,14 +103,6 @@ class DTLSClient extends
      }*/
 
     public int[] getCipherSuites() {
-        int[] suites = {CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
-            CipherSuite.TLS_ECDHE_ECDSA_WITH_AES_256_CBC_SHA,// (0xc00a)
-            CipherSuite.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,// (0xc014)
-            CipherSuite.TLS_DHE_RSA_WITH_AES_256_CBC_SHA,// (0x0039)
-            CipherSuite.TLS_RSA_WITH_AES_256_CBC_SHA,// (0x0035)
-            CipherSuite.TLS_RSA_WITH_3DES_EDE_CBC_SHA,// (0x000a)
-            CipherSuite.TLS_EMPTY_RENEGOTIATION_INFO_SCSV
-        };
         return suites;
     }
 
