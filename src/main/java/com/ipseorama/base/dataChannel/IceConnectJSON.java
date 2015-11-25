@@ -24,13 +24,17 @@ import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
+import java.util.Collection;
 import java.util.List;
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
+import javax.json.JsonObjectBuilder;
 import javax.json.JsonValue;
 import org.ice4j.ice.Candidate;
+import org.ice4j.ice.LocalCandidate;
+import org.ice4j.ice.harvest.TrickleCallback;
 
 /**
  *
@@ -44,25 +48,45 @@ public class IceConnectJSON extends IceConnect {
         super(port);
     }
 
+    public void startIce(final CandidateSender cs) {
+        TrickleCallback tcb = new TrickleCallback() {
+            @Override
+            public void onIceCandidates(Collection<LocalCandidate> clctn) {
+                if (clctn != null) {
+                    for (Candidate c : clctn) {
+                        haveLocalCandy(true);
+                        JsonObject j = buildCandidateJson(c);
+                        cs.sendCandidate(j);
+                    }
+                }
+            }
+        };
+        _localAgent.startCandidateTrickle(tcb);
+        super.startIce();
+
+    }
+
     public void setOffer(JsonObject message) throws IOException {
         String offer = message.getString("type");
-        if (!"offer".equalsIgnoreCase(offer)){
-            throw new java.io.IOException("we expected an offer, got: "+offer);
+        if (!"offer".equalsIgnoreCase(offer)) {
+            throw new java.io.IOException("we expected an offer, got: " + offer);
         }
         setSDP(message);
 
     }
+
     public void setAnswer(JsonObject message) throws IOException {
         String answer = message.getString("type");
         String session = message.getString("session");
-        if (!_session.equalsIgnoreCase(session)){
-            throw new java.io.IOException("session mixup, expected : "+_session);
+        if (!_session.equalsIgnoreCase(session)) {
+            throw new java.io.IOException("session mixup, expected : " + _session);
         }
-        if (!"answer".equalsIgnoreCase(answer)){
-            throw new java.io.IOException("we expected an answer, got: "+answer);
+        if (!"answer".equalsIgnoreCase(answer)) {
+            throw new java.io.IOException("we expected an answer, got: " + answer);
         }
         setSDP(message);
     }
+
     public void setSDP(JsonObject message) throws IOException {
         // honestly - you look at this and you just wish for groovy or xpath to write this in a declarative way.
         JsonObject sdpo = message.getJsonObject("sdp");
@@ -81,20 +105,14 @@ public class IceConnectJSON extends IceConnect {
 
             String proto = media.getString("proto");
             _mid = ((JsonObject) content).getString("mid", "data");
-            String setup = ((JsonObject) content).getString("setup","unknown");
+            String setup = ((JsonObject) content).getString("setup", "unknown");
             _dtlsClientRole = "active".equalsIgnoreCase(setup) || "actpass".equalsIgnoreCase(setup);
             if ("DTLS/SCTP".equals(proto)) {
                 JsonObject ice = ((JsonObject) content).getJsonObject("ice");
                 String ufrag = ice.getString("ufrag");
                 String pass = ice.getString("pwd");
-                
                 try {
                     buildIce(ufrag, pass);
-                    try {
-                        Thread.sleep(3000);
-                    } catch (InterruptedException ex) {
-                        ;
-                    }
                 } catch (InterruptedException ex) {
                     Log.error(ex.toString());
                 } catch (IllegalArgumentException ex) {
@@ -113,31 +131,57 @@ public class IceConnectJSON extends IceConnect {
         }
     }
 
+    public void addRemoteCandidate(JsonObject message) throws IOException {
+        String session = message.getString("session");
+        String to = message.getString("to");
+        String type = message.getString("type");
+        if (to.equals(_to) && (type.equalsIgnoreCase("candidate"))) {
+            JsonObject jcandy = message.getJsonObject("candidate");
+            addCandidate(jcandy.getString("foundation"), jcandy.getString("component"), jcandy.getString("protocol"), jcandy.getString("priority"), jcandy.getString("ip"), jcandy.getString("port"), jcandy.getString("type"));
+        }
+    }
+
+    public JsonObject buildCandidateJson(Candidate candy) {
+        String farPrint = getFarFingerprint().replaceAll(":", "");
+        return Json.createObjectBuilder()
+                .add("to", farPrint)
+                .add("type", "candidate")
+                .add("sdpMLineIndex","0")
+                .add("session", _session)
+                .add("candidate", mkCandidateJson(candy)).build();
+    }
+
+    public JsonObjectBuilder mkCandidateJson(Candidate candy) {
+        return Json.createObjectBuilder()
+                .add("foundation", candy.getFoundation())
+                .add("component", "" + candy.getParentComponent().getComponentID())
+                .add("protocol", candy.getTransport().toString())
+                .add("priority", candy.getPriority())
+                .add("ip", candy.getTransportAddress().getHostAddress())
+                .add("port", candy.getTransportAddress().getPort())
+                .add("type", candy.getType().toString())
+                .add("generation", "0");
+    }
+
     public JsonArrayBuilder mkCandidates() {
         JsonArrayBuilder ret = Json.createArrayBuilder();
         List<Candidate> candies = getCandidates();
         //{"sdpMLineIndex":1,"sdpMid":"data","candidate":{"foundation":"2169522962","component":"1","protocol":"tcp","priority":"1509957375","ip":"192.67.4.33","port":"0","type":"host","generation":"0\r\n"}
         for (Candidate candy : candies) {
-            ret.add(Json.createObjectBuilder()
-                    .add("foundation", candy.getFoundation())
-                    .add("component", candy.getParentComponent().getComponentID())
-                    .add("protocol", candy.getTransport().toString())
-                    .add("priority", candy.getPriority())
-                    .add("ip", candy.getTransportAddress().getHostAddress())
-                    .add("port", candy.getTransportAddress().getPort())
-                    .add("type", candy.getType().toString())
-                    .add("generation", "0")
-            );
+            ret.add(mkCandidateJson(candy));
         }
         return ret;
     }
+
     public JsonObject mkAnswer() {
-        return mkSDP("answer","passive");
+        return mkSDP("answer", "passive");
     }
+
     public JsonObject mkOffer() {
-        return mkSDP("offer","actpass");
+        return mkSDP("offer", "actpass");
     }
-    public JsonObject mkSDP(String type,String setup) {
+
+    public JsonObject mkSDP(String type, String setup) {
         String farPrint = getFarFingerprint().replaceAll(":", "");
         Log.debug("farprint is " + farPrint);
         JsonObject ans = Json.createObjectBuilder()
@@ -173,7 +217,7 @@ public class IceConnectJSON extends IceConnect {
                                                 .add("required", "1")
                                         )
                                         .add("mid", _mid)
-                                        .add("setup", this._dtlsClientRole?"active":"passive")
+                                        .add("setup", this._dtlsClientRole ? "active" : "passive")
                                         .add("sctpmap", Json.createArrayBuilder()
                                                 .add(Json.createObjectBuilder()
                                                         .add("port", 5000)
@@ -198,6 +242,7 @@ public class IceConnectJSON extends IceConnect {
                  )*/
                 .build();
         Log.verb("Sending" + ans.toString());
+
         return ans;
         //{"contents":[
         //{"candidates":[]

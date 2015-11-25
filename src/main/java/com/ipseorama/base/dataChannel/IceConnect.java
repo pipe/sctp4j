@@ -44,13 +44,17 @@ import org.ice4j.ice.RemoteCandidate;
 public class IceConnect implements PropertyChangeListener {
 
     private long startTime;
-    private Agent _localAgent;
+    protected Agent _localAgent;
     private static CertHolder _cert;
     private AssociationListener _al;
     private String _ffp;
     public Runnable cleanup;
     private DTLSEndpoint _dtls;
     protected boolean _dtlsClientRole = true;
+    private boolean _wantToStartIce;
+    protected boolean _haveLocalCandy;
+    protected boolean _haveRemoteCandy;
+    private boolean _iceStarted;
 
     public void setAssociationListener(AssociationListener al) {
         this._al = al;
@@ -59,10 +63,9 @@ public class IceConnect implements PropertyChangeListener {
     IceConnect(int port) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
         _cert = new JksCertHolder();
         _ffp = null;
-        _localAgent = createAgent(false);
+        _localAgent = createAgent(true);
         _localAgent.addStateChangeListener(this);
-        _localAgent.setTa(250);
-        _localAgent.setTrickling(false);
+        //_localAgent.setTa(250);
 
         _localAgent.setNominationStrategy(
                 NominationStrategy.NOMINATE_FIRST_VALID);
@@ -95,8 +98,24 @@ public class IceConnect implements PropertyChangeListener {
      }
      */
 
+    private void tryToStartIce() {
+        if (_wantToStartIce && _haveRemoteCandy && _haveLocalCandy && !_iceStarted) {
+            _iceStarted = true;
+            _localAgent.startConnectivityEstablishment();
+            Log.debug("Actually starting Ice ");
+
+        } else {
+            if (_iceStarted){
+                Log.debug("Ice already started ");
+            }else {
+                Log.debug("cant start Ice yet "+_wantToStartIce +" "+ _haveRemoteCandy +" "+ _haveLocalCandy );
+            }
+        }
+    }
+
     public void startIce() {
-        _localAgent.startConnectivityEstablishment();
+        _wantToStartIce = true;
+        tryToStartIce();
     }
 
     void buildIce(String ufrag, String upass) throws InterruptedException, IllegalArgumentException, IOException {
@@ -145,19 +164,33 @@ public class IceConnect implements PropertyChangeListener {
         return _ffp;
     }
 
+    protected void haveLocalCandy(boolean have) {
+        _haveLocalCandy |= have;
+        if (_haveLocalCandy) {
+            tryToStartIce();
+        }
+    }
+    protected void haveRemoteCandy(boolean have) {
+        _haveRemoteCandy |= have;
+        if (_haveRemoteCandy) {
+            tryToStartIce();
+        }
+    }
     public List<Candidate> getCandidates() {
         ArrayList<Candidate> ret = new ArrayList();
         IceMediaStream st = getStream("data");
-        for (Component comp : st.getComponents()) {
-            for (Candidate candy : comp.getLocalCandidates()) {
-                if (candy.getHostAddress().isIPv6()) {
-                    Log.debug("not adding " + candy);
-                } else {
-                    Log.debug("adding " + candy);
-                    ret.add(candy);
+        if (st != null) {
+            List<Component> a = st.getComponents();
+            if (a != null) {
+                for (Component comp : a) {
+                    for (Candidate candy : comp.getLocalCandidates()) {
+                        Log.debug("adding " + candy);
+                        ret.add(candy);
+                    }
                 }
             }
         }
+        haveLocalCandy(ret.size() > 0);
         return ret;
     }
 
@@ -300,6 +333,7 @@ public class IceConnect implements PropertyChangeListener {
         IceMediaStream localStream = getStream("data");
         List<Component> localComponents = localStream.getComponents();
         int cid = Integer.parseInt(component);
+        boolean rc = false;
         for (Component localComponent : localComponents) {
             int id = localComponent.getComponentID();
             if (cid == id) {
@@ -314,10 +348,13 @@ public class IceConnect implements PropertyChangeListener {
                         foundation,
                         lpriority,
                         null));
+                rc = true;
             }
-
         }
-
+        if (rc){
+            haveRemoteCandy(true);
+        }
+        
     }
 
     IceMediaStream getStream(String target) {
