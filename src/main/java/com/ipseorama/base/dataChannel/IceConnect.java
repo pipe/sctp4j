@@ -207,10 +207,6 @@ public class IceConnect implements PropertyChangeListener {
             switch (st) {
                 case COMPLETED:
                     synchronized (this) {
-                        if (_dtls != null) {
-                            Log.error("Duplicate  completion we have a DTLS service so ignore it...");
-                            break;
-                        }
                         IceMediaStream s = getStream("data");
 
                         Component comp = s.getComponent(1);
@@ -223,11 +219,19 @@ public class IceConnect implements PropertyChangeListener {
                         TransportAddress rta = cp.getRemoteCandidate().getTransportAddress();
                         if (lds.isBound()) {
                             Log.debug("local ds bound to " + lds.getLocalSocketAddress());
+                        } else {
+                            Log.debug("local ds not bound "+ lds.getLocalSocketAddress());
+                            break;
                         }
                         if (lds.isConnected()) {
                             Log.debug("local ds connected to" + lds.getRemoteSocketAddress());
+                        } else {
+                            Log.debug("local ds not connected "+ lds.getRemoteSocketAddress());
                         }
-
+                        if (_dtls != null) {
+                            Log.error("Duplicate  completion we have a DTLS service so now what ??? ");
+                            break;
+                        }
                         try {
                             DatagramTransport ds = mkTransport(lds, rta);
                             Log.debug("DTLS role " + (_dtlsClientRole ? "client" : "server"));
