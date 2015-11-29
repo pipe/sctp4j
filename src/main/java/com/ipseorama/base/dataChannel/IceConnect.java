@@ -21,6 +21,7 @@ import org.ice4j.security.LongTermCredential;
 import com.phono.srtplight.Log;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
@@ -32,10 +33,10 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.ice4j.ice.Candidate;
 import org.ice4j.ice.CandidatePair;
 import org.ice4j.ice.CandidateType;
-import org.ice4j.ice.CompatibilityMode;
 import org.ice4j.ice.Component;
 import org.ice4j.ice.IceProcessingState;
 import org.ice4j.ice.RemoteCandidate;
+import org.ice4j.socket.IceSocketWrapper;
 
 /**
  *
@@ -65,7 +66,7 @@ public class IceConnect implements PropertyChangeListener {
         _ffp = null;
         _localAgent = createAgent(true);
         _localAgent.addStateChangeListener(this);
-        //_localAgent.setTa(250);
+        _localAgent.setTa(250);
 
         _localAgent.setNominationStrategy(
                 NominationStrategy.NOMINATE_FIRST_VALID);
@@ -105,10 +106,10 @@ public class IceConnect implements PropertyChangeListener {
             Log.debug("Actually starting Ice ");
 
         } else {
-            if (_iceStarted){
+            if (_iceStarted) {
                 Log.debug("Ice already started ");
-            }else {
-                Log.debug("cant start Ice yet "+_wantToStartIce +" "+ _haveRemoteCandy +" "+ _haveLocalCandy );
+            } else {
+                Log.debug("cant start Ice yet " + _wantToStartIce + " " + _haveRemoteCandy + " " + _haveLocalCandy);
             }
         }
     }
@@ -170,12 +171,14 @@ public class IceConnect implements PropertyChangeListener {
             tryToStartIce();
         }
     }
+
     protected void haveRemoteCandy(boolean have) {
         _haveRemoteCandy |= have;
         if (_haveRemoteCandy) {
             tryToStartIce();
         }
     }
+
     public List<Candidate> getCandidates() {
         ArrayList<Candidate> ret = new ArrayList();
         IceMediaStream st = getStream("data");
@@ -206,27 +209,29 @@ public class IceConnect implements PropertyChangeListener {
 
             switch (st) {
                 case COMPLETED:
+                    Log.debug("Ice " + st.name());
                     synchronized (this) {
                         IceMediaStream s = getStream("data");
 
                         Component comp = s.getComponent(1);
-                        Transport t = comp.getTransport();
-
                         CandidatePair cp = comp.getSelectedPair();
-                        DatagramSocket lds = cp.getLocalCandidate().getDatagramSocket();
 
-                        Log.debug("selected Datagram socket" + lds.toString());
+                        IceSocketWrapper isw = cp.getIceSocketWrapper();
                         TransportAddress rta = cp.getRemoteCandidate().getTransportAddress();
+                        DatagramSocket lds = isw.getUDPSocket();
+                        // todo - might not be UDP in future - 
+                        Log.debug("selected Ice socket" + isw.toString());
                         if (lds.isBound()) {
                             Log.debug("local ds bound to " + lds.getLocalSocketAddress());
                         } else {
-                            Log.debug("local ds not bound "+ lds.getLocalSocketAddress());
+                            Log.debug("local ds not bound bailing..." + lds.getLocalSocketAddress());
                             break;
                         }
-                        if (lds.isConnected()) {
-                            Log.debug("local ds connected to" + lds.getRemoteSocketAddress());
+                        if (rta != null) {
+                            Log.debug("remote transport address " + rta.toString());
                         } else {
-                            Log.debug("local ds not connected "+ lds.getRemoteSocketAddress());
+                            Log.debug("remote rta not set bailing..." + cp.getRemoteCandidate());
+                            break;
                         }
                         if (_dtls != null) {
                             Log.error("Duplicate  completion we have a DTLS service so now what ??? ");
@@ -235,7 +240,6 @@ public class IceConnect implements PropertyChangeListener {
                         try {
                             DatagramTransport ds = mkTransport(lds, rta);
                             Log.debug("DTLS role " + (_dtlsClientRole ? "client" : "server"));
-
                             if (_dtlsClientRole) {
                                 _dtls = new DTLSClient(_cert, ds, _al, _ffp);
                             } else {
@@ -256,22 +260,20 @@ public class IceConnect implements PropertyChangeListener {
                     Log.debug("Ice Failed");
                     cleanup.run();
                     break;
-                case TERMINATED:
-                    Log.debug("Ice Terminated");
-                    _dtls = null;
-                    //_localAgent.free();
-                    //cleanup.run();
-                    break;
                 case WAITING:
                     Log.debug("Ice Waiting");
                     break;
+                case TERMINATED:
+                    Log.debug("Ice Terminated");
+                    break;
+
             }
         }
     }
 
     protected static Agent createAgent(boolean isTrickling) throws IllegalArgumentException, IOException {
         long startTime = System.currentTimeMillis();
-        Agent agent = new Agent(CompatibilityMode.RFC5245);
+        Agent agent = new Agent();
         agent.setTrickling(isTrickling);
 
         // STUN
@@ -355,10 +357,10 @@ public class IceConnect implements PropertyChangeListener {
                 rc = true;
             }
         }
-        if (rc){
+        if (rc) {
             haveRemoteCandy(true);
         }
-        
+
     }
 
     IceMediaStream getStream(String target) {

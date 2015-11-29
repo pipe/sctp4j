@@ -65,7 +65,7 @@ class DTLSClient extends
 
     @Override
     public ProtocolVersion getClientVersion() {
-        return ProtocolVersion.DTLSv12;
+        return ProtocolVersion.DTLSv10;
     }
 
     @Override
