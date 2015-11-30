@@ -228,15 +228,15 @@ public class IceConnect implements PropertyChangeListener {
                         TransportAddress rta = cp.getRemoteCandidate().getTransportAddress();
 
                         DatagramSocket lds = cp.getDatagramSocket();
-                        Log.debug("lds is of type "+lds.getClass().getName());
-                        if (lds instanceof MultiplexingDatagramSocket){ 
+                        Log.debug("lds is of type " + lds.getClass().getName());
+                        if (lds instanceof MultiplexingDatagramSocket) {
                             try {
-                                lds = ((MultiplexingDatagramSocket)lds).getSocket(new DTLSDatagramFilter());
+                                lds = ((MultiplexingDatagramSocket) lds).getSocket(new DTLSDatagramFilter());
                             } catch (SocketException ex) {
-                                Log.error("cant make DTLS MultiplexedDatagramSocket because: "+ex.toString());
+                                Log.error("cant make DTLS MultiplexedDatagramSocket because: " + ex.toString());
                             }
                         }
-                        Log.debug("new lds is of type "+lds.getClass().getName());               
+                        Log.debug("new lds is of type " + lds.getClass().getName());
                         // todo - might not be UDP in future - 
                         Log.debug("selected Ice socket" + isw.toString());
                         if (lds.isBound()) {
@@ -363,6 +363,7 @@ public class IceConnect implements PropertyChangeListener {
             if (cid == id) {
                 int iport = Integer.parseInt(port);
                 long lpriority = Long.parseLong(priority);
+
                 TransportAddress ta = new TransportAddress(ip, iport, Transport.parse(protocol));
                 // localComponent.setDefaultRemoteCandidate(remoteComponent.getDefaultCandidate());
                 localComponent.addRemoteCandidate(new RemoteCandidate(
@@ -372,7 +373,9 @@ public class IceConnect implements PropertyChangeListener {
                         foundation,
                         lpriority,
                         null));
-                rc = true;
+                if (protocol.equalsIgnoreCase("udp")) {
+                    rc = true;
+                }
             }
         }
         if (rc) {
