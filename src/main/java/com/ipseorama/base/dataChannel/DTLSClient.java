@@ -60,7 +60,6 @@ class DTLSClient extends
         _client = new Thread(this);
         _client.setName("DTLSlient");
         _client.start();
-
     }
 
     @Override

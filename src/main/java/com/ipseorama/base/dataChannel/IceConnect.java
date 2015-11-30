@@ -23,12 +23,15 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.SocketException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.ice4j.ice.Candidate;
 import org.ice4j.ice.CandidatePair;
@@ -36,7 +39,11 @@ import org.ice4j.ice.CandidateType;
 import org.ice4j.ice.Component;
 import org.ice4j.ice.IceProcessingState;
 import org.ice4j.ice.RemoteCandidate;
+import org.ice4j.socket.DTLSDatagramFilter;
+import org.ice4j.socket.DatagramPacketFilter;
 import org.ice4j.socket.IceSocketWrapper;
+import org.ice4j.socket.MultiplexedDatagramSocket;
+import org.ice4j.socket.MultiplexingDatagramSocket;
 
 /**
  *
@@ -73,6 +80,7 @@ public class IceConnect implements PropertyChangeListener {
 
         //let them fight ... fights forge character.
         _localAgent.setControlling(_dtlsClientRole);
+        _localAgent.setPerformConsentFreshness(true);
 
         //STREAMS
         createStream(port, "data", _localAgent);
@@ -218,7 +226,17 @@ public class IceConnect implements PropertyChangeListener {
 
                         IceSocketWrapper isw = cp.getIceSocketWrapper();
                         TransportAddress rta = cp.getRemoteCandidate().getTransportAddress();
-                        DatagramSocket lds = isw.getUDPSocket();
+
+                        DatagramSocket lds = cp.getDatagramSocket();
+                        Log.debug("lds is of type "+lds.getClass().getName());
+                        if (lds instanceof MultiplexingDatagramSocket){ 
+                            try {
+                                lds = ((MultiplexingDatagramSocket)lds).getSocket(new DTLSDatagramFilter());
+                            } catch (SocketException ex) {
+                                Log.error("cant make DTLS MultiplexedDatagramSocket because: "+ex.toString());
+                            }
+                        }
+                        Log.debug("new lds is of type "+lds.getClass().getName());               
                         // todo - might not be UDP in future - 
                         Log.debug("selected Ice socket" + isw.toString());
                         if (lds.isBound()) {

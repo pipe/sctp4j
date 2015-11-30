@@ -53,12 +53,6 @@ public class PlainDatagramTransport implements org.bouncycastle.crypto.tls.Datag
             _ds.receive(p);
             Log.debug("recv'd " + p.getLength());
             ret = p.getLength();
-            if (ret > 0) {
-                boolean ok = checkPacketIsDTLS(buf[0]);
-                if (!ok) {
-                    ret = 0;
-                }
-            }
         }
         return ret;
     }
@@ -76,34 +70,6 @@ public class PlainDatagramTransport implements org.bouncycastle.crypto.tls.Datag
         _isShutdown = true;
         _ds.close();
 
-    }
-
-    private boolean checkPacketIsDTLS(byte first) {
-        boolean dtls = false;
-        int b = 0x7f & first;
-        if (first < 0) {
-            b += 128;
-        }
-
-        /*
-         RFC
-         +----------------+
-         | 127 < B < 192 -+--> forward to RTP
-         |                |
-         packet-->|  19 < B < 64  -+--> forward to DTLS
-         |                |
-         |       B < 2   -+--> forward to STUN
-         +----------------+
-         */
-        if ((b > 127) && (b < 192)) {
-            Log.debug("RTP packet!");
-        } else if ((b > 19) && (b < 64)) {
-            Log.debug("DTLS packet!");
-            dtls = true;
-        } else if (b < 2) {
-            Log.debug("STUN packet!");
-        }
-        return dtls;
     }
 
 }
