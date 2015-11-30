@@ -23,9 +23,9 @@ import org.bouncycastle.crypto.util.PrivateKeyFactory;
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
 public class JksCertHolder extends CertHolder{
-    protected String _ksFileName = "/project2/westhawk/keys/wildcard/wildwesthawk.ks";
-    protected char [] _pass = {'y', 'e', 'e', 'h', 'a', 'a'};
-    protected String _alias = "wildwest";
+    final static protected String _ksFileName = "ipsecert.ks";
+    final static protected char [] _pass = {'s','e','c','r','e','t'};
+    final static protected String _alias = "me";
     public JksCertHolder() throws UnrecoverableEntryException, KeyStoreException, IOException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
         super();
     }
