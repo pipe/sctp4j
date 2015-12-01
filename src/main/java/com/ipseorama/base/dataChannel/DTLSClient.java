@@ -60,12 +60,11 @@ class DTLSClient extends
         _client = new Thread(this);
         _client.setName("DTLSlient");
         _client.start();
-
     }
 
     @Override
     public ProtocolVersion getClientVersion() {
-        return ProtocolVersion.DTLSv12;
+        return ProtocolVersion.DTLSv10;
     }
 
     @Override

@@ -50,12 +50,18 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
 
     @Override
     public void run() {
+        byte buffer[] = new byte[0];
+        Log.debug("recv queue starting ");
         try {
-            Log.debug("recv queue starting ");
-            byte buffer[] = new byte[this.getReceiveLimit()];
+            buffer = new byte[this.getReceiveLimit()];
             _ds.setSoTimeout(1000);
+        } catch (IOException ex) {
+            _isShutdown = true;
+            Log.debug("problem in starting recv thread " + ex.getMessage());
+        }
+        while (!_isShutdown) {
+            try {
 
-            while (!_isShutdown) {
                 DatagramPacket p = new DatagramPacket(buffer, 0, buffer.length);
                 _ds.receive(p);
                 Log.debug("recv'd " + p.getLength());
@@ -74,10 +80,11 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
                         Log.debug("overflowed stack");
                     }
                 }
+            } catch (IOException ex) {
+                Log.debug("problem in running recv thread " + ex.getMessage());
             }
-        } catch (IOException ex) {
-            Log.debug("problem in recv thread " + ex.getMessage());
         }
+
     }
 
     public int receive(byte[] buf, int off, int len, int waitMillis) throws IOException {
