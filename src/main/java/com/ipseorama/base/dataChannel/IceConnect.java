@@ -76,10 +76,10 @@ public class IceConnect implements PropertyChangeListener {
         _localAgent.setTa(250);
 
         _localAgent.setNominationStrategy(
-                NominationStrategy.NOMINATE_FIRST_VALID);
+                NominationStrategy.NOMINATE_FIRST_HOST_OR_REFLEXIVE_VALID);
 
         //let them fight ... fights forge character.
-        _localAgent.setControlling(_dtlsClientRole);
+        _localAgent.setControlling(!this._dtlsClientRole);
         _localAgent.setPerformConsentFreshness(true);
 
         //STREAMS
