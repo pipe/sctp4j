@@ -303,7 +303,7 @@ public class IceConnect implements PropertyChangeListener {
         String[] hostnames = new String[]{"146.148.121.175"};
         int port = 3478;
         LongTermCredential longTermCredential
-                = new LongTermCredential("pet", "snoopy");
+                = new LongTermCredential("device", "bone");
 
         for (String hostname : hostnames) {
             agent.addCandidateHarvester(
