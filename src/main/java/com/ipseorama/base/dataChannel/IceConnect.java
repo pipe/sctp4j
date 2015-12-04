@@ -21,7 +21,6 @@ import org.ice4j.security.LongTermCredential;
 import com.phono.srtplight.Log;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
 import java.security.KeyStoreException;
@@ -30,8 +29,6 @@ import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.ice4j.ice.Candidate;
 import org.ice4j.ice.CandidatePair;
@@ -40,9 +37,7 @@ import org.ice4j.ice.Component;
 import org.ice4j.ice.IceProcessingState;
 import org.ice4j.ice.RemoteCandidate;
 import org.ice4j.socket.DTLSDatagramFilter;
-import org.ice4j.socket.DatagramPacketFilter;
 import org.ice4j.socket.IceSocketWrapper;
-import org.ice4j.socket.MultiplexedDatagramSocket;
 import org.ice4j.socket.MultiplexingDatagramSocket;
 
 /**
@@ -67,9 +62,11 @@ public class IceConnect implements PropertyChangeListener {
     public void setAssociationListener(AssociationListener al) {
         this._al = al;
     }
-
     IceConnect(int port) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
-        _cert = new JksCertHolder();
+        this(port,null);
+    }
+    IceConnect(int port,CertHolder certH) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
+        _cert = (certH == null) ? new JksCertHolder():certH ;
         _ffp = null;
         _localAgent = createAgent(true);
         _localAgent.addStateChangeListener(this);

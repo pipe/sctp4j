@@ -6,6 +6,7 @@
 package com.ipseorama.base.dataChannel;
 
 import com.ipseorama.base.certHolders.CertHolder;
+import com.ipseorama.device.endpoints.PermittedAssociationListener;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.AssociationListener;
 import com.ipseorama.sctp.small.ThreadedAssociation;
@@ -32,8 +33,7 @@ import org.bouncycastle.crypto.tls.UseSRTPData;
  * @author tim
  */
 class DTLSServer extends
-        DefaultTlsServer implements  Runnable, DTLSEndpoint {
-
+        DefaultTlsServer implements Runnable, DTLSEndpoint {
 
     private DTLSServerProtocol _serverProtocol;
     private boolean _isShutdown;
@@ -45,11 +45,16 @@ class DTLSServer extends
     private Object nap;
     private final DatagramTransport _dt;
 
-    public DTLSServer(CertHolder cert, DatagramTransport dt, AssociationListener al, String farFingerprint)  throws Exception {
-        
+    public DTLSServer(CertHolder cert, DatagramTransport dt, AssociationListener al, String farFingerprint) throws Exception {
+
         _al = al;
         _cert = cert;
         _ffp = farFingerprint;
+        if (_al instanceof PermittedAssociationListener) {
+            PermittedAssociationListener pal = (PermittedAssociationListener) _al;
+            pal.setCert(cert);
+            pal.setFarFinger(farFingerprint);
+        }
         _dt = dt;
         nap = new Object();
         if (_dt != null) {
@@ -163,6 +168,9 @@ class DTLSServer extends
             throw new IOException("fingerprints don't match ");
         }
         _verified = true;
+        if (_al instanceof PermittedAssociationListener) {
+            ((PermittedAssociationListener) _al).verifiedFarCert(cs[0]);
+        }
     }
 
     /**

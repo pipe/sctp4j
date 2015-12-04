@@ -122,4 +122,8 @@ public abstract class SCTPStream {
     public Association getAssociation() {
         return _ass;
     }
+
+    public void close() {
+        Log.debug("close() Not supported yet.");
+    }
 }

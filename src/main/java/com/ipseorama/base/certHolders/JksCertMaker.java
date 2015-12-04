@@ -189,6 +189,8 @@ public class JksCertMaker extends JksCertHolder {
                 ret = true;
                 Log.debug(friend + " fp matches");
                 break;
+            } else {
+                Log.debug(friend +" \n\t"+fp +"\nvs\n\t"+cfp);
             }
         }
         return ret;
@@ -254,6 +256,8 @@ public class JksCertMaker extends JksCertHolder {
             JksCertMaker s = new JksCertMaker();
             String googDerBase64 = "MIIBmTCCAQKgAwIBAgIEPlDfrjANBgkqhkiG9w0BAQsFADARMQ8wDQYDVQQDDAZXZWJSVEMwHhcNMTUxMTIzMTE1NDI3WhcNMTUxMjIzMTE1NDI3WjARMQ8wDQYDVQQDDAZXZWJSVEMwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBALhwh5n2+2IozDaycqMpLmfF1u03KAzOcxd+925lKPPrqDqy9NWF5IgTeYRg42k2Vu/RNVbGOpZBzP8DHENleBLJHJ29ZuZy2CRPSQF7CfwMPsBYDnOTkGtZbPGu+37Yn6/ZTOdRXJHFxHPrc5yy5CSCdDvznEBffSj7xgV55txzAgMBAAEwDQYJKoZIhvcNAQELBQADgYEAZjzk20bBPZuopQU2hdLRl5iFzukzGaQPb0lfiplYWwR+vNWRAVvtxCqY8DGTQ7xyaDGjV00OCzCKAhBNGJlI7WPgd23FTBr5SIHS6JmSCOlGaqBkr1u6DH7NJEYlN4g7tz2BnixIwm55zJqK8X/7o5SAfgjxFU2kWv8xHGJEHgg=";
             String googFingerprint = "41:5A:6B:17:29:C1:24:9F:BE:10:AC:BA:1C:C9:B0:A9:57:2E:50:E9:3A:4C:8F:65:4B:1F:DD:27:D5:A9:29:2A";
+            String fgoogDerBase64 = "MIIBmTCCAQKgAwIBAgIEV4t3kzANBgkqhkiG9w0BAQsFADARMQ8wDQYDVQQDDAZXZWJSVEMwHhcNMTUxMjA0MTMwODM1WhcNMTYwMTAzMTMwODM1WjARMQ8wDQYDVQQDDAZXZWJSVEMwgZ8wDQYJKoZIhvcNAQEBBQADgY0AMIGJAoGBAK6VpdM0VTH4F7NrteazILXkZlTl9lT4JXq4LbAipX/hbTrgGb+XcP45EvuCWh2BBFo7pfFZS1goEEJ5w/fWbWnIpioIadKI+cu2ZZv6nFH2LnAx0ytTAwZ87t2HWVL4zLCzmTiRtqZephqK5oZQCBRvVO47I6bMPoDoNR5Zcv0/AgMBAAEwDQYJKoZIhvcNAQELBQADgYEAMnFJuGI5FOVhQKuwH/SVyBh3MT8QBx88ebxSk8qx9M8l6gEnwaXCHYxhl5gdGQVxV42TS2X1XDjypZlnPAdANBF0kJH3xVW3c28wJsP2xtt3OYwLIuKsjogjeIVKUdwoyfGC1CJAlOwSKNTeoqkOERw7Fa8bTte4L7xGMxDyUwk=";
+            String fgoogFingerprint = "89:B5:9B:FD:EE:16:DC:72:CC:24:22:DC:BF:73:03:F5:1B:B0:93:35:D5:DD:77:5B:44:EB:69:8C:60:2A:CA:5A";
             Log.debug("My fingerprint is " + s.getPrint(false));
 
             boolean master = s.hasMaster();
@@ -267,17 +271,44 @@ public class JksCertMaker extends JksCertHolder {
             master = s.hasMaster();
             Log.debug("Key store " + (master ? "has" : "hasnt") + " got a master");
             s.listFriends();
+            byte[] fmb = biz.source_code.Base64Coder.decode(fgoogDerBase64);
+            org.bouncycastle.asn1.x509.Certificate fc = org.bouncycastle.asn1.x509.Certificate.getInstance(fmb);
+            s.putFriendCert("canary", fc);
+            s.listFriends();
             org.bouncycastle.asn1.x509.Certificate mc = s.getMasterCert();
             Log.debug("Retrieved master cert " + mc.getSubject().toString());
             String mprint = s.getMasterPrint();
             Log.debug("Retrieved master fp " + mprint);
-            boolean isfr = s.isAFriendPrint(googFingerprint);
+            boolean isfr = s.isAFriendPrint(fgoogFingerprint);
             Log.debug("prints " + (isfr ? "match " : "dont match"));
+            boolean isMaster = s.isMaster(googFingerprint);
+            Log.debug("sample print " + (isMaster ? "master " : "not master"));
+            s.removeFriendCert("master", mc);
+            master = s.hasMaster();
+            s.removeFriendCert("canary", fc);
+            Log.debug("Key store " + (master ? "has" : "hasnt") + " got a master");
+            s.listFriends();
 
         } catch (Exception ex) {
             Log.error(ex.toString());
             ex.printStackTrace();
         }
+    }
+
+    public void removeFriendCert(String id, org.bouncycastle.asn1.x509.Certificate cert) throws KeyStoreException, FileNotFoundException, IOException, NoSuchAlgorithmException, CertificateException {
+        KeyStore ks = KeyStore.getInstance(KeyStore.getDefaultType());
+
+        FileInputStream fis = new java.io.FileInputStream(_ksFileName);
+        ks.load(fis, _pass);
+        ks.deleteEntry(id);
+        FileOutputStream fos = new FileOutputStream(_ksFileName);
+        ks.store(fos, _pass);
+        fos.close();
+    }
+
+    public boolean isMaster(String farFinger) throws KeyStoreException, IOException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
+        String master = getMasterPrint();
+        return master.equalsIgnoreCase(farFinger);
     }
 
 }

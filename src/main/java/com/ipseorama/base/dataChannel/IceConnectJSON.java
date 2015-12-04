@@ -17,6 +17,7 @@
  */
 package com.ipseorama.base.dataChannel;
 
+import com.ipseorama.base.certHolders.JksCertMaker;
 import com.phono.srtplight.Log;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -43,7 +44,9 @@ import org.ice4j.ice.harvest.TrickleCallback;
 public class IceConnectJSON extends IceConnect {
 
     private String _session, _to, _type, _mid;
-
+    public IceConnectJSON(int port,JksCertMaker cert) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
+        super(port,cert);
+    }
     public IceConnectJSON(int port) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
         super(port);
     }
