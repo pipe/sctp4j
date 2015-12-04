@@ -23,7 +23,7 @@ public abstract class PermittedEndpointMaker implements PermittedAssociationList
     private Certificate _verifiedFarCert;
     private String _farFinger;
 
-    PermittedEndpointMaker() {
+    public PermittedEndpointMaker() {
     }
 
     @Override

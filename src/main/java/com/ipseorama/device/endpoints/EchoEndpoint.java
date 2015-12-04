@@ -13,7 +13,7 @@ import com.phono.srtplight.Log;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-class EchoEndpoint implements SCTPStreamListener {
+public class EchoEndpoint implements SCTPStreamListener {
 
     public EchoEndpoint() {
         Log.debug("Making an echo stream");

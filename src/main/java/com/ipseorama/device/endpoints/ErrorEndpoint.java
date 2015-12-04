@@ -15,7 +15,7 @@ import javax.json.JsonObject;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-class ErrorEndpoint extends JsonEndpoint {
+public class ErrorEndpoint extends JsonEndpoint {
 
     public ErrorEndpoint(SCTPStream s) {
         super(s);

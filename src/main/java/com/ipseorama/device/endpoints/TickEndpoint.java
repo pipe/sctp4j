@@ -17,7 +17,7 @@ import java.util.TimerTask;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-class TickEndpoint implements SCTPStreamListener {
+public class TickEndpoint implements SCTPStreamListener {
     Timer ticker;
     public TickEndpoint(SCTPStream s) {
         Log.debug("Made Tick endpoint");
