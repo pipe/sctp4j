@@ -44,9 +44,13 @@ import org.ice4j.ice.harvest.TrickleCallback;
 public class IceConnectJSON extends IceConnect {
 
     private String _session, _to, _type, _mid;
-    public IceConnectJSON(int port,JksCertMaker cert) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
-        super(port,cert);
+    private String _us;
+
+    public IceConnectJSON(int port, JksCertMaker cert) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
+        super(port, cert);
+        _us = cert.getPrint(false);
     }
+
     public IceConnectJSON(int port) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
         super(port);
     }
@@ -88,6 +92,14 @@ public class IceConnectJSON extends IceConnect {
             throw new java.io.IOException("we expected an answer, got: " + answer);
         }
         setSDP(message);
+    }
+
+    public void setSession(String session) {
+        _session = session;
+    }
+
+    public void setMid(String mid) {
+        _mid = mid;
     }
 
     public void setSDP(JsonObject message) throws IOException {
@@ -149,19 +161,19 @@ public class IceConnectJSON extends IceConnect {
         return Json.createObjectBuilder()
                 .add("to", farPrint)
                 .add("type", "candidate")
-                .add("sdpMLineIndex","0")
+                .add("sdpMLineIndex", "0")
                 .add("session", _session)
                 .add("candidate", mkCandidateJson(candy)).build();
     }
 
     public JsonObjectBuilder mkCandidateJson(Candidate candy) {
         return Json.createObjectBuilder()
-                .add("foundation", candy.getFoundation())
+                .add("foundation", ""+candy.getFoundation())
                 .add("component", "" + candy.getParentComponent().getComponentID())
                 .add("protocol", candy.getTransport().toString())
-                .add("priority", candy.getPriority())
+                .add("priority", ""+candy.getPriority())
                 .add("ip", candy.getTransportAddress().getHostAddress())
-                .add("port", candy.getTransportAddress().getPort())
+                .add("port", ""+candy.getTransportAddress().getPort())
                 .add("type", candy.getType().toString())
                 .add("generation", "0");
     }
@@ -189,6 +201,7 @@ public class IceConnectJSON extends IceConnect {
         Log.debug("farprint is " + farPrint);
         JsonObject ans = Json.createObjectBuilder()
                 .add("to", farPrint)
+                .add("from",_us)
                 .add("type", type)
                 .add("session", _session)
                 .add("sdp", Json.createObjectBuilder()

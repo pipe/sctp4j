@@ -34,6 +34,7 @@ import org.bouncycastle.asn1.ASN1Sequence;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x509.AlgorithmIdentifier;
 import org.bouncycastle.asn1.x509.SubjectPublicKeyInfo;
+import org.bouncycastle.asn1.x509.Time;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v1CertificateBuilder;
 import org.bouncycastle.crypto.tls.Certificate;
@@ -190,7 +191,7 @@ public class JksCertMaker extends JksCertHolder {
                 Log.debug(friend + " fp matches");
                 break;
             } else {
-                Log.debug(friend +" \n\t"+fp +"\nvs\n\t"+cfp);
+                Log.debug(friend + " \n\t" + fp + "\nvs\n\t" + cfp);
             }
         }
         return ret;
@@ -265,8 +266,15 @@ public class JksCertMaker extends JksCertHolder {
 
             byte[] mb = biz.source_code.Base64Coder.decode(googDerBase64);
             org.bouncycastle.asn1.x509.Certificate c = org.bouncycastle.asn1.x509.Certificate.getInstance(mb);
-            System.out.print(c.getSubject().toString());
-            System.out.println(" Issuer " + c.getIssuer().toString());
+            Log.debug(c.getSubject().toString());
+            Log.debug(" Issuer " + c.getIssuer().toString());
+            Log.debug(" start date " + c.getStartDate().toString());
+            Log.debug(" end date " + c.getEndDate().toString());
+
+            Long msd = c.getEndDate().getDate().getTime() - c.getStartDate().getDate().getTime();
+            Long dur = msd / (1000 * 60 * 60 * 24);
+            Log.debug("days " + dur);
+
             s.putMasterCert(c);
             master = s.hasMaster();
             Log.debug("Key store " + (master ? "has" : "hasnt") + " got a master");
