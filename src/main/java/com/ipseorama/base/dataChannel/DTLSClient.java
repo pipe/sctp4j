@@ -90,6 +90,7 @@ class DTLSClient extends
             if (_verified) {
                 Association a = new ThreadedAssociation(dtls, _al); // todo - association listener api is wrong.
                 Log.debug("Association = " + a.toString());
+                //a.sendInit();
             } else {
                 Log.error("Not the client fingerprint we were looking for (waves hand)");
             }

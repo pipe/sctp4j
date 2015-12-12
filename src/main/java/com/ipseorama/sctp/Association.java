@@ -44,6 +44,8 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
  */
 abstract public class Association {
 
+
+
     /**
      * <code>
      *                     -----          -------- (from any state)
@@ -368,6 +370,11 @@ abstract public class Association {
         return ret;
     }
 
+    public void sendInit() {
+        InitChunk c = new InitChunk();
+        
+    }
+    
     protected Chunk[] inboundInit(InitChunk init) {
         Chunk[] reply = null;
         _peerVerTag = init.getInitiateTag();

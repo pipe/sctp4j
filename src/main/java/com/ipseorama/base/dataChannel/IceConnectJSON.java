@@ -189,7 +189,7 @@ public class IceConnectJSON extends IceConnect {
     }
 
     public JsonObject mkAnswer() {
-        return mkSDP("answer", "passive");
+        return mkSDP("answer", "active");
     }
 
     public JsonObject mkOffer() {
@@ -233,7 +233,7 @@ public class IceConnectJSON extends IceConnect {
                                                 .add("required", "1")
                                         )
                                         .add("mid", _mid)
-                                        .add("setup", this._dtlsClientRole ? "active" : "passive")
+                                        .add("setup", setup)
                                         .add("sctpmap", Json.createArrayBuilder()
                                                 .add(Json.createObjectBuilder()
                                                         .add("port", 5000)

@@ -16,7 +16,7 @@ import javax.json.*;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-abstract class JsonEndpoint implements SCTPStreamListener {
+public abstract class JsonEndpoint implements SCTPStreamListener {
 
     SCTPStream _stream;
 
