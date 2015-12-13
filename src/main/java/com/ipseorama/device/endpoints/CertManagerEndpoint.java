@@ -29,7 +29,7 @@ public class CertManagerEndpoint extends JsonEndpoint {
     }
 
     @Override
-    protected JsonObject onJsonMessage(JsonObject messj) {
+    public JsonObject onJsonMessage(JsonObject messj) {
         JsonObjectBuilder ret = Json.createObjectBuilder();
         String action = messj.getString("action");
         String certb64 = messj.getString("cert");

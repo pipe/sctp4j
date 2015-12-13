@@ -22,7 +22,7 @@ public class ErrorEndpoint extends JsonEndpoint {
     }
 
     @Override
-    protected JsonObject onJsonMessage(JsonObject messj) {
+    public JsonObject onJsonMessage(JsonObject messj) {
         return Json.createObjectBuilder().add("status", "failed").add("errorMessage", "You are not my master").build();
     }
     

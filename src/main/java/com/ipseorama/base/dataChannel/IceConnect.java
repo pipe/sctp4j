@@ -58,6 +58,7 @@ public class IceConnect implements PropertyChangeListener {
     protected boolean _haveLocalCandy;
     protected boolean _haveRemoteCandy;
     private boolean _iceStarted;
+    protected boolean _offerer;
 
     public void setAssociationListener(AssociationListener al) {
         this._al = al;
@@ -255,10 +256,21 @@ public class IceConnect implements PropertyChangeListener {
                         try {
                             DatagramTransport ds = mkTransport(lds, rta);
                             Log.debug("DTLS role " + (_dtlsClientRole ? "client" : "server"));
+                            final boolean offerer = _offerer;
                             if (_dtlsClientRole) {
-                                _dtls = new DTLSClient(_cert, ds, _al, _ffp);
+                                _dtls = new DTLSClient(_cert, ds, _al, _ffp) {
+                                    @Override
+                                    public boolean shouldInitiateAssociation() {
+                                        return offerer;
+                                    }
+                                };
                             } else {
-                                _dtls = new DTLSServer(_cert, ds, _al, _ffp);
+                                _dtls = new DTLSServer(_cert, ds, _al, _ffp) {
+                                    @Override
+                                    public boolean shouldInitiateAssociation() {
+                                        return offerer;
+                                    }
+                                };
                             }
                         } catch (Exception ex) {
                             Log.debug("DTLS exception");

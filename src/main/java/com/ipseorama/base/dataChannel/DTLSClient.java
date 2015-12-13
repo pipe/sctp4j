@@ -27,7 +27,7 @@ import org.bouncycastle.crypto.tls.TlsCredentials;
  *
  * @author tim
  */
-class DTLSClient extends
+abstract class DTLSClient extends
         org.bouncycastle.crypto.tls.DefaultTlsClient implements Runnable, DTLSEndpoint {
 
     private final CertHolder _cert;
@@ -90,12 +90,14 @@ class DTLSClient extends
             if (_verified) {
                 Association a = new ThreadedAssociation(dtls, _al); // todo - association listener api is wrong.
                 Log.debug("Association = " + a.toString());
-                //a.sendInit();
+                if (this.shouldInitiateAssociation()){
+                    a.sendInit();
+                }
             } else {
                 Log.error("Not the client fingerprint we were looking for (waves hand)");
             }
 
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             Log.error("dtls client failed " + ex.toString());
             ex.printStackTrace();
         }

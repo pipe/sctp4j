@@ -32,7 +32,7 @@ import org.bouncycastle.crypto.tls.UseSRTPData;
  *
  * @author tim
  */
-class DTLSServer extends
+abstract class DTLSServer extends
         DefaultTlsServer implements Runnable, DTLSEndpoint {
 
     private DTLSServerProtocol _serverProtocol;
@@ -97,6 +97,9 @@ class DTLSServer extends
             Log.debug("DTLS accept. verified = " + _verified);
             if (_verified) {
                 Association a = new ThreadedAssociation(dtlsServer, _al); // todo - association listener api is wrong.
+                if (this.shouldInitiateAssociation()){
+                    a.sendInit();
+                }
             } else {
                 Log.error("Not the fingerprint we were looking for (waves hand)");
             }
@@ -200,5 +203,6 @@ class DTLSServer extends
         }
         super.processClientExtensions(clientExtensions);
     }
+
 
 }

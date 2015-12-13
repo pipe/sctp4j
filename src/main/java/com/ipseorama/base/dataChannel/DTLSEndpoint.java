@@ -11,5 +11,5 @@ package com.ipseorama.base.dataChannel;
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
 interface DTLSEndpoint {
-    
+    public boolean shouldInitiateAssociation();
 }

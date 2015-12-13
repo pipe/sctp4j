@@ -119,7 +119,23 @@ public class InitChunk extends Chunk {
     public long getInitialTSN(){
         return _initialTSN;
     }
+    public void setInitialTSN(long tsn){
+        _initialTSN = tsn;
+    }
+    public void setAdRecWinCredit(long credit){
+        _adRecWinCredit = credit;
+    }
+    public void setNumOutStreams(int outn){
+        _numOutStreams = outn;
+    }
+    public void setNumInStreams(int inn){
+        _numInStreams = inn;
+    }
     public byte [] getFarSupportedExtensions(){
         return _farSupportedExtensions;
     }        
+
+    public void setVerTag(long _nearTSN) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
 }

@@ -189,16 +189,21 @@ public class IceConnectJSON extends IceConnect {
     }
 
     public JsonObject mkAnswer() {
-        return mkSDP("answer", "active");
+        return mkSDP("answer", null);
     }
 
     public JsonObject mkOffer() {
+        _offerer = true;
         return mkSDP("offer", "actpass");
     }
 
     public JsonObject mkSDP(String type, String setup) {
         String farPrint = getFarFingerprint().replaceAll(":", "");
         Log.debug("farprint is " + farPrint);
+        String ssetup = setup;
+        if (_offerer){
+            ssetup = (_dtlsClientRole) ? "active":"passive";
+        }
         JsonObject ans = Json.createObjectBuilder()
                 .add("to", farPrint)
                 .add("from",_us)
@@ -233,7 +238,7 @@ public class IceConnectJSON extends IceConnect {
                                                 .add("required", "1")
                                         )
                                         .add("mid", _mid)
-                                        .add("setup", setup)
+                                        .add("setup", ssetup)
                                         .add("sctpmap", Json.createArrayBuilder()
                                                 .add(Json.createObjectBuilder()
                                                         .add("port", 5000)

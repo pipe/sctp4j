@@ -370,8 +370,16 @@ abstract public class Association {
         return ret;
     }
 
-    public void sendInit() {
+    public void sendInit() throws SctpPacketFormatException, IOException {
         InitChunk c = new InitChunk();
+        c.setInitialTSN(this._nearTSN);
+        c.setNumInStreams(this.MAXSTREAMS);
+        c.setNumOutStreams(this.MAXSTREAMS);
+        c.setAdRecWinCredit(this.MAXBUFF);
+        c.setVerTag(_nearTSN);
+        Chunk[] s = new Chunk[1];
+        s[0] = c;
+        this.send(s);
         
     }
     
