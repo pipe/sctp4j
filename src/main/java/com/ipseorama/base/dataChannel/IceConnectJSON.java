@@ -121,7 +121,21 @@ public class IceConnectJSON extends IceConnect {
             String proto = media.getString("proto");
             _mid = ((JsonObject) content).getString("mid", "data");
             String setup = ((JsonObject) content).getString("setup", "unknown");
-            _dtlsClientRole = "active".equalsIgnoreCase(setup) || "actpass".equalsIgnoreCase(setup);
+            switch (setup){
+                case "active": 
+                    _dtlsClientRole = false; // ie they are active, so we arent
+                    break;
+                case "passive": 
+                    _dtlsClientRole = true; // they are passive, so we have to take the lead
+                    break;
+                case "actpass":
+                    _dtlsClientRole = true; // we have a mild preference for going first and
+                        // they don't care
+                    break;
+                default:
+                    Log.error("Huh? setup type unrecognized "+ setup);
+                    break;
+            }
             if ("DTLS/SCTP".equals(proto)) {
                 JsonObject ice = ((JsonObject) content).getJsonObject("ice");
                 String ufrag = ice.getString("ufrag");
@@ -189,7 +203,7 @@ public class IceConnectJSON extends IceConnect {
     }
 
     public JsonObject mkAnswer() {
-        return mkSDP("answer", null);
+        return mkSDP("answer", this._dtlsClientRole ? "active":"passive");
     }
 
     public JsonObject mkOffer() {
@@ -200,10 +214,6 @@ public class IceConnectJSON extends IceConnect {
     public JsonObject mkSDP(String type, String setup) {
         String farPrint = getFarFingerprint().replaceAll(":", "");
         Log.debug("farprint is " + farPrint);
-        String ssetup = setup;
-        if (_offerer){
-            ssetup = (_dtlsClientRole) ? "active":"passive";
-        }
         JsonObject ans = Json.createObjectBuilder()
                 .add("to", farPrint)
                 .add("from",_us)
@@ -238,7 +248,7 @@ public class IceConnectJSON extends IceConnect {
                                                 .add("required", "1")
                                         )
                                         .add("mid", _mid)
-                                        .add("setup", ssetup)
+                                        .add("setup", setup)
                                         .add("sctpmap", Json.createArrayBuilder()
                                                 .add(Json.createObjectBuilder()
                                                         .add("port", 5000)

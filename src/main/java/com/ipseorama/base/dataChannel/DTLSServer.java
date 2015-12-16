@@ -97,7 +97,7 @@ abstract class DTLSServer extends
             Log.debug("DTLS accept. verified = " + _verified);
             if (_verified) {
                 Association a = new ThreadedAssociation(dtlsServer, _al); // todo - association listener api is wrong.
-                if (this.shouldInitiateAssociation()){
+                if (shouldInitiateAssociation()){
                     a.sendInit();
                 }
             } else {

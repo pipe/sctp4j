@@ -266,8 +266,17 @@ abstract public class Association {
                     Log.debug("Got an INIT when not closed - ignoring it");
                 }
                 break;
+            case Chunk.INITACK:
+                Log.debug("got initack " + c.toString());
+                if (_state == State.COOKIEWAIT){
+                    InitAckChunk iack = (InitAckChunk) c;
+                    reply = iackDeal(iack);
+                } else {
+                    Log.debug("Got an INITACK when not waiting for it - ignoring it");
+                }
+                break;
             case Chunk.COOKIE_ECHO:
-                Log.debug("got data " + c.toString());
+                Log.debug("got cookie echo " + c.toString());
                 reply = cookieEchoDeal((CookieEchoChunk) c);
 
                 if (reply.length > 0) {
@@ -379,10 +388,26 @@ abstract public class Association {
         c.setVerTag(_nearTSN);
         Chunk[] s = new Chunk[1];
         s[0] = c;
-        this.send(s);
-        
+        this._state = State.COOKIEWAIT;
+        this.send(s); // todo need timer here.....
     }
-    
+    protected Chunk[] iackDeal(InitAckChunk iack) {
+                Chunk[] reply = null;
+
+        iack.getAdRecWinCredit();
+        iack.getInitialTSN();
+        iack.getInitialTSN();
+        iack.getNumInStreams();
+        iack.getNumOutStreams();
+        iack.getSupportedExtensions(_supportedExtensions);
+        iack.getCookie();
+        CookieEchoChunk ce = new CookieEchoChunk();
+        // todo set fields
+        reply = new Chunk[1];
+        reply[0] = ce;
+        return reply;
+    }
+
     protected Chunk[] inboundInit(InitChunk init) {
         Chunk[] reply = null;
         _peerVerTag = init.getInitiateTag();

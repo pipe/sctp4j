@@ -64,26 +64,54 @@ public class InitAckChunk extends Chunk {
         super((byte) INITACK);
     }
 
+    public int getInitiateTag() {
+        return _initiateTag;
+    }
+
     public void setInitiateTag(int v) {
         _initiateTag = v;
+    }
+
+    public long getAdRecWinCredit() {
+        return _adRecWinCredit;
     }
 
     public void setAdRecWinCredit(int v) {
         _adRecWinCredit = v;
     }
 
+    public int getNumOutStreams() {
+        return _numOutStreams;
+    }
+
     public void setNumOutStreams(int v) {
         _numOutStreams = v;
     }
+
+    public int getNumInStreams() {
+        return _numInStreams;
+    }
+
     public void setNumInStreams(int v) {
         _numInStreams = v;
     }
+
+    public long getInitialTSN() {
+        return _initialTSN;
+    }
+
     public void setInitialTSN(long v) {
         _initialTSN = v;
     }
-    public void setCookie(byte [] v) {
+
+    public byte[] getCookie() {
+        return _cookie;
+    }
+
+    public void setCookie(byte[] v) {
         _cookie = v;
     }
+
     public InitAckChunk(byte type, byte flags, int length, ByteBuffer pkt) {
         super(type, flags, length, pkt);
         if (_body.remaining() >= 16) {
@@ -132,20 +160,24 @@ public class InitAckChunk extends Chunk {
     @Override
     void putFixedParams(ByteBuffer ret) {
         ret.putInt(_initiateTag);
-        putUnsignedInt(ret,_adRecWinCredit);
+        putUnsignedInt(ret, _adRecWinCredit);
         ret.putChar((char) _numOutStreams);
         ret.putChar((char) _numInStreams);
-        putUnsignedInt(ret,_initialTSN);
-        if (_cookie != null){
+        putUnsignedInt(ret, _initialTSN);
+        if (_cookie != null) {
             StateCookie sc = new StateCookie();
             sc.setData(_cookie);
             _varList.add(sc);
         }
-        if (_supportedExtensions != null){
+        if (_supportedExtensions != null) {
             SupportedExtensions se = new SupportedExtensions();
             se.setData(_supportedExtensions);
             _varList.add(se);
         }
+    }
+
+    public byte[] getSupportedExtensions(byte[] v) {
+        return _supportedExtensions;
     }
 
     public void setSupportedExtensions(byte[] v) {

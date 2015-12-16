@@ -86,6 +86,10 @@ public class CookieEchoChunk extends Chunk {
         _cookieData = new byte[_body.remaining()];
         _body.get(_cookieData);
     }
+
+    public CookieEchoChunk() {
+        super((byte)COOKIE_ECHO);
+    }
     @Override
     public void validate() throws SctpPacketFormatException{
         if (_cookieData.length != Association.COOKIESIZE){
