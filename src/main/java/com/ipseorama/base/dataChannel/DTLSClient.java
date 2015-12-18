@@ -17,6 +17,7 @@ import org.bouncycastle.crypto.tls.Certificate;
 import org.bouncycastle.crypto.tls.CertificateRequest;
 import org.bouncycastle.crypto.tls.CipherSuite;
 import org.bouncycastle.crypto.tls.DTLSClientProtocol;
+import org.bouncycastle.crypto.tls.DTLSTransport;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.bouncycastle.crypto.tls.DefaultTlsSignerCredentials;
 import org.bouncycastle.crypto.tls.ProtocolVersion;
@@ -84,14 +85,13 @@ abstract class DTLSClient extends
             SecureRandom sec = new SecureRandom();
             DTLSClientProtocol protocol = new DTLSClientProtocol(sec);
             Log.debug("DTLS client protocol created " + _verified);
-
-            DatagramTransport dtls = protocol.connect(this, _dt);
+            DTLSTransport dtls = protocol.connect(this, _dt);
             Log.debug("DTLS client connected. verified = " + _verified);
             if (_verified) {
-                Association a = new ThreadedAssociation(dtls, _al); // todo - association listener api is wrong.
+                Association a = makeAssociation(dtls, _al); // todo - association listener api is wrong.
                 Log.debug("Association = " + a.toString());
                 if (shouldInitiateAssociation()){
-                    a.sendInit();
+                    a.associate();
                 }
             } else {
                 Log.error("Not the client fingerprint we were looking for (waves hand)");

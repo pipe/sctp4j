@@ -35,7 +35,7 @@ public class InitChunk extends Chunk {
      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
      */
 
-    int _initiateTag;
+    long _initiateTag;
     long _adRecWinCredit;
     int _numOutStreams;
     int _numInStreams;
@@ -96,7 +96,7 @@ public class InitChunk extends Chunk {
 
     @Override
     void putFixedParams(ByteBuffer ret) {
-        ret.putInt(_initiateTag);
+        ret.putInt((int)_initiateTag);
         putUnsignedInt(ret,_adRecWinCredit);
         ret.putChar((char) _numOutStreams);
         ret.putChar((char) _numInStreams);
@@ -104,7 +104,7 @@ public class InitChunk extends Chunk {
     }
 
     public int getInitiateTag() {
-        return _initiateTag;
+        return (int)_initiateTag;
     }
     
     public long getAdRecWinCredit(){
@@ -135,7 +135,7 @@ public class InitChunk extends Chunk {
         return _farSupportedExtensions;
     }        
 
-    public void setVerTag(long _nearTSN) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    public void setInitiate(long tag) {
+        this._initiateTag = tag;
     }
 }

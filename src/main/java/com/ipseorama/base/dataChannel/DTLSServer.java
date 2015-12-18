@@ -96,9 +96,9 @@ abstract class DTLSServer extends
             dtlsServer = _serverProtocol.accept(this, _dt);
             Log.debug("DTLS accept. verified = " + _verified);
             if (_verified) {
-                Association a = new ThreadedAssociation(dtlsServer, _al); // todo - association listener api is wrong.
+                Association a = makeAssociation(dtlsServer, _al); // todo - association listener api is wrong.
                 if (shouldInitiateAssociation()){
-                    a.sendInit();
+                    a.associate();
                 }
             } else {
                 Log.error("Not the fingerprint we were looking for (waves hand)");

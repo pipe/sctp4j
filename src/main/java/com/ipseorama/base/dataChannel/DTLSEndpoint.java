@@ -6,10 +6,15 @@
 
 package com.ipseorama.base.dataChannel;
 
+import com.ipseorama.sctp.Association;
+import com.ipseorama.sctp.AssociationListener;
+import org.bouncycastle.crypto.tls.DTLSTransport;
+
 /**
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
 interface DTLSEndpoint {
     public boolean shouldInitiateAssociation();
+    public Association makeAssociation(DTLSTransport trans, AssociationListener li);
 }

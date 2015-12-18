@@ -125,25 +125,17 @@ public class InitAckChunk extends Chunk {
                 VariableParam v = readVariable();
                 _varList.add(v);
             }
-            /*
-             for (VariableParam v : _varList){
-             // now look for variables we are expecting...
-             System.out.println("variable of type: "+v.getName()+" "+ v.toString());
-             if (v instanceof SupportedExtensions){
-             _farSupportedExtensions = ((SupportedExtensions)v).getData();
-             } else if (v instanceof RandomParam){
-             _farRandom = ((RandomParam)v).getData();
-             } else if (v instanceof ForwardTSNsupported){
-             _farForwardTSNsupported = true;
-             } else if (v instanceof RequestedHMACAlgorithmParameter){
-             _farHmacs = ((RequestedHMACAlgorithmParameter)v).getData();
-             } else if (v instanceof ChunkListParam){
-             _farChunks = ((ChunkListParam)v).getData();
-             } else {
-             System.out.println("unexpected variable of type: "+v.getName());
-             }
-             }
-             */
+
+            for (VariableParam v : _varList) {
+                // now look for variables we are expecting...
+                System.out.println("variable of type: " + v.getName() + " " + v.toString());
+                if (v instanceof StateCookie) {
+                    _cookie = ((StateCookie) v).getData();
+                } else {
+                    System.out.println("ignored variable of type: " + v.getName());
+                }
+            }
+
         }
     }
 

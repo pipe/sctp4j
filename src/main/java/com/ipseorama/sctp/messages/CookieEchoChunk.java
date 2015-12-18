@@ -21,6 +21,7 @@ import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
 import com.ipseorama.sctp.messages.params.StateCookie;
 import com.ipseorama.sctp.messages.params.VariableParam;
+import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
 
 /**
@@ -106,6 +107,7 @@ public class CookieEchoChunk extends Chunk {
     }
     @Override
     void putFixedParams(ByteBuffer ret) {
+        Log.debug("cookie is "+_cookieData +"and buffer is "+ret);
         ret.put(_cookieData);
     }
     

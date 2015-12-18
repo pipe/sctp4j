@@ -7,7 +7,9 @@ package com.ipseorama.base.dataChannel;
 
 import com.ipseorama.base.certHolders.CertHolder;
 import com.ipseorama.base.certHolders.JksCertHolder;
+import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.AssociationListener;
+import com.ipseorama.sctp.leakey.LeakyAssociation;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import org.ice4j.Transport;
@@ -29,6 +31,7 @@ import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
+import org.bouncycastle.crypto.tls.DTLSTransport;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.ice4j.ice.Candidate;
 import org.ice4j.ice.CandidatePair;
@@ -257,11 +260,18 @@ public class IceConnect implements PropertyChangeListener {
                             DatagramTransport ds = mkTransport(lds, rta);
                             Log.debug("DTLS role " + (_dtlsClientRole ? "client" : "server"));
                             final boolean offerer = _offerer;
+                            Log.debug("SDP role  " + (_offerer ? "offer" : "answer"));
+
                             if (_dtlsClientRole) {
                                 _dtls = new DTLSClient(_cert, ds, _al, _ffp) {
                                     @Override
                                     public boolean shouldInitiateAssociation() {
                                         return offerer;
+                                    }
+
+                                    @Override
+                                    public Association makeAssociation(DTLSTransport trans, AssociationListener li) {
+                                        return new LeakyAssociation(trans,li);
                                     }
                                 };
                             } else {
@@ -269,6 +279,11 @@ public class IceConnect implements PropertyChangeListener {
                                     @Override
                                     public boolean shouldInitiateAssociation() {
                                         return offerer;
+                                    }
+
+                                    @Override
+                                    public Association makeAssociation(DTLSTransport trans, AssociationListener li) {
+                                        return new LeakyAssociation(trans,li);
                                     }
                                 };
                             }

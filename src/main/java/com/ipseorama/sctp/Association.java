@@ -44,7 +44,7 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
  */
 abstract public class Association {
 
-
+    public abstract void associate() throws SctpPacketFormatException, IOException;
 
     /**
      * <code>
@@ -137,7 +137,7 @@ abstract public class Association {
     final private HashMap<Integer, SCTPStream> _streams;
     private final AssociationListener _al;
     private HashMap<Long, DataChunk> _outbound;
-    private State _state;
+    protected State _state;
     private HashMap<Long, DataChunk> _holdingPen;
 
     ;
@@ -226,7 +226,7 @@ abstract public class Association {
         _streams = new HashMap();
         _outbound = new HashMap<Long, DataChunk>();
         _holdingPen = new HashMap<Long, DataChunk>();
-
+        _nearTSN = _random.nextInt(Integer.MAX_VALUE);
         _state = State.CLOSED;
         if (_transp != null) {
             startRcv();
@@ -256,19 +256,20 @@ abstract public class Association {
     private boolean deal(Chunk c) throws IOException, SctpPacketFormatException {
         int ty = c.getType();
         boolean ret = true;
+        State oldState = _state;
         Chunk[] reply = null;
         switch (ty) {
             case Chunk.INIT:
-                if (_state == State.CLOSED) {
+                if ((_state == State.CLOSED) || (_state == State.COOKIEWAIT) || (_state == State.COOKIEECHOED)) {
                     InitChunk init = (InitChunk) c;
                     reply = inboundInit(init);
                 } else {
-                    Log.debug("Got an INIT when not closed - ignoring it");
+                    Log.debug("Got an INIT when state was " + _state.name() + " - ignoring it");
                 }
                 break;
             case Chunk.INITACK:
                 Log.debug("got initack " + c.toString());
-                if (_state == State.COOKIEWAIT){
+                if (_state == State.COOKIEWAIT) {
                     InitAckChunk iack = (InitAckChunk) c;
                     reply = iackDeal(iack);
                 } else {
@@ -278,9 +279,14 @@ abstract public class Association {
             case Chunk.COOKIE_ECHO:
                 Log.debug("got cookie echo " + c.toString());
                 reply = cookieEchoDeal((CookieEchoChunk) c);
-
                 if (reply.length > 0) {
                     ret = !(reply[0] instanceof ErrorChunk); // ignore any following data chunk. 
+                }
+                break;
+            case Chunk.COOKIE_ACK:
+                Log.debug("got cookie ack " + c.toString());
+                if (_state == State.COOKIEECHOED) {
+                    _state = State.ESTABLISHED;
                 }
                 break;
             case Chunk.DATA:
@@ -289,9 +295,6 @@ abstract public class Association {
                 break;
             case Chunk.ABORT:
                 // no reply we should just bail I think.
-                if (null != _al) {
-                    _al.onDisAssociated(this);
-                }
                 _rcv = null;
                 _transp.close();
                 break;
@@ -308,6 +311,16 @@ abstract public class Association {
             // theoretically could be multiple DATA in a single packet - 
             // we'd send multiple SACKs in reply - ToDo fix that
             send(reply);
+        }
+        if ((_state == State.ESTABLISHED) && (oldState != State.ESTABLISHED)) {
+            if (null != _al) {
+                _al.onAssociated(this);
+            }
+        }
+        if ((oldState == State.ESTABLISHED) && (_state != State.ESTABLISHED)) {
+            if (null != _al) {
+                _al.onDisAssociated(this);
+            }
         }
         return ret;
     }
@@ -385,35 +398,76 @@ abstract public class Association {
         c.setNumInStreams(this.MAXSTREAMS);
         c.setNumOutStreams(this.MAXSTREAMS);
         c.setAdRecWinCredit(this.MAXBUFF);
-        c.setVerTag(_nearTSN);
+        c.setInitiate(this.getMyVerTag());
         Chunk[] s = new Chunk[1];
         s[0] = c;
         this._state = State.COOKIEWAIT;
         this.send(s); // todo need timer here.....
     }
+
     protected Chunk[] iackDeal(InitAckChunk iack) {
-                Chunk[] reply = null;
+        Chunk[] reply = null;
 
         iack.getAdRecWinCredit();
-        iack.getInitialTSN();
         iack.getInitialTSN();
         iack.getNumInStreams();
         iack.getNumOutStreams();
         iack.getSupportedExtensions(_supportedExtensions);
-        iack.getCookie();
+        byte[] data = iack.getCookie();
         CookieEchoChunk ce = new CookieEchoChunk();
-        // todo set fields
+        ce.setCookieData(data);
         reply = new Chunk[1];
         reply[0] = ce;
+        this._state = State.COOKIEECHOED;
         return reply;
     }
 
+    /* <pre>
+     5.2.1.  INIT Received in COOKIE-WAIT or COOKIE-ECHOED State (Item B)
+
+     This usually indicates an initialization collision, i.e., each
+     endpoint is attempting, at about the same time, to establish an
+     association with the other endpoint.
+
+     Upon receipt of an INIT in the COOKIE-WAIT state, an endpoint MUST
+     respond with an INIT ACK using the same parameters it sent in its
+     original INIT chunk (including its Initiate Tag, unchanged).  When
+     responding, the endpoint MUST send the INIT ACK back to the same
+     address that the original INIT (sent by this endpoint) was sent.
+
+     Upon receipt of an INIT in the COOKIE-ECHOED state, an endpoint MUST
+     respond with an INIT ACK using the same parameters it sent in its
+     original INIT chunk (including its Initiate Tag, unchanged), provided
+     that no NEW address has been added to the forming association.  If
+     the INIT message indicates that a new address has been added to the
+     association, then the entire INIT MUST be discarded, and NO changes
+     should be made to the existing association.  An ABORT SHOULD be sent
+     in response that MAY include the error 'Restart of an association
+     with new addresses'.  The error SHOULD list the addresses that were
+     added to the restarting association.
+
+     When responding in either state (COOKIE-WAIT or COOKIE-ECHOED) with
+     an INIT ACK, the original parameters are combined with those from the
+     newly received INIT chunk.  The endpoint shall also generate a State
+     Cookie with the INIT ACK.  The endpoint uses the parameters sent in
+     its INIT to calculate the State Cookie.
+
+     After that, the endpoint MUST NOT change its state, the T1-init timer
+     shall be left running, and the corresponding TCB MUST NOT be
+     destroyed.  The normal procedures for handling State Cookies when a
+     TCB exists will resolve the duplicate INITs to a single association.
+
+     For an endpoint that is in the COOKIE-ECHOED state, it MUST populate
+     its Tie-Tags within both the association TCB and inside the State
+     Cookie (see Section 5.2.2 for a description of the Tie-Tags).
+     </pre>
+     */
     protected Chunk[] inboundInit(InitChunk init) {
         Chunk[] reply = null;
         _peerVerTag = init.getInitiateTag();
         _winCredit = init.getAdRecWinCredit();
-        _farTSN = init.getInitialTSN()-1;
-        _nearTSN = _random.nextInt(Integer.MAX_VALUE);
+        _farTSN = init.getInitialTSN() - 1;
+
         _maxOutStreams = Math.min(init.getNumInStreams(), MAXSTREAMS);
         _maxInStreams = Math.min(init.getNumOutStreams(), MAXSTREAMS);
         InitAckChunk iac = new InitAckChunk();
@@ -475,8 +529,8 @@ abstract public class Association {
         Long tsn_L = new Long(tsn);
         if (tsn > _farTSN) {
             // put it in the pen.
-            DataChunk dup = _holdingPen.get(tsn_L) ;
-            if (dup!=null){
+            DataChunk dup = _holdingPen.get(tsn_L);
+            if (dup != null) {
                 duplicates.add(tsn_L);
             } else {
                 _holdingPen.put(tsn_L, dc);
@@ -489,7 +543,7 @@ abstract public class Association {
                 if (dc != null) {
                     ingest(dc, rep);
                 } else {
-                    Log.verb("gap in inbound tsns at "+t);
+                    Log.verb("gap in inbound tsns at " + t);
                     gap = true;
                 }
             }
@@ -502,7 +556,7 @@ abstract public class Association {
         l.addAll(_holdingPen.keySet());
         Collections.sort(l);
 
-        SackChunk sack = mkSack(l,duplicates);
+        SackChunk sack = mkSack(l, duplicates);
         rep.add(sack);
         return rep.toArray(dummy);
     }
@@ -524,6 +578,10 @@ abstract public class Association {
             // check rollover - will break at maxint.
             rep[0] = ack;
 
+        } else {
+            Log.debug("got a dcep ack for "+ s.getLabel());
+            SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
+            s.setBehave(behave);
         }
         return rep;
     }
@@ -567,7 +625,7 @@ abstract public class Association {
      */
     private Chunk[] cookieEchoDeal(CookieEchoChunk echo) {
         Chunk[] reply = new Chunk[0];
-        if (_state == State.CLOSED) {
+        if (_state == State.CLOSED || _state == State.COOKIEWAIT || _state == State.COOKIEECHOED) {
             // Authenticate the State Cookie
             CookieHolder cookie;
             if (null != (cookie = checkCookieEcho(echo.getCookieData()))) {
@@ -582,9 +640,6 @@ abstract public class Association {
                      chunk or SACK chunk; however, the COOKIE ACK MUST be the first
                      chunk in the SCTP packet.
                      */
-                    if (null != _al) {
-                        _al.onAssociated(this);
-                    }
                     reply = new Chunk[1];
                     reply[0] = new CookieAckChunk();
                 } else {
@@ -609,7 +664,7 @@ abstract public class Association {
         return reply;
     }
 
-    private SackChunk mkSack(ArrayList<Long> pen,ArrayList<Long> dups) {
+    private SackChunk mkSack(ArrayList<Long> pen, ArrayList<Long> dups) {
         // Notice that this is the dumbest possible sack implementation
         // it assumes no gaps, because we ignore unexpected packets in dataDeal()
         // mucho room for improvement....
@@ -634,7 +689,16 @@ abstract public class Association {
     public abstract void enqueue(DataChunk d);
 
     public abstract SCTPStream mkStream(int id);
-
+    
+    public SCTPStream mkStream(String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
+        int n = 1;
+        int tries = this._maxOutStreams;
+        do {
+            n=_random.nextInt(this._maxOutStreams);
+            if (--tries < 0) throw new StreamNumberInUseException();
+        } while (_streams.containsKey(new Integer(n)));
+        return mkStream(n,label);
+    }
     public SCTPStream mkStream(int sno, String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
         SCTPStream sout;
         if (canSend()) {

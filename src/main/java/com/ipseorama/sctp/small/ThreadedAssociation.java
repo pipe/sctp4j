@@ -23,6 +23,7 @@ import com.ipseorama.sctp.SCTPMessage;
 import com.ipseorama.sctp.SCTPStream;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
+import com.ipseorama.sctp.messages.InitAckChunk;
 import com.ipseorama.sctp.messages.InitChunk;
 import com.ipseorama.sctp.messages.SackChunk;
 import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
@@ -33,6 +34,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 
 /**
@@ -46,7 +49,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     private ArrayBlockingQueue<DataChunk> _freeBlocks;
     private HashMap<Long, DataChunk> _inFlight;
     private long _lastCumuTSNAck;
-
+    final static int MAX_INIT_RETRANS = 8;
     // a guess at the round-trip time
     private long _rto = 200;
 
@@ -120,6 +123,7 @@ public class ThreadedAssociation extends Association implements Runnable {
      */
     private int _transpMTU = 768;
     private final SimpleSCTPTimer _timer;
+    private Chunk[] _stashCookieEcho;
 
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
         super(transport, al);
@@ -138,6 +142,57 @@ public class ThreadedAssociation extends Association implements Runnable {
         }
         _timer = new SimpleSCTPTimer();
 
+    }
+    /*
+     If the T1-init timer expires at "A" after the INIT or COOKIE ECHO
+     chunks are sent, the same INIT or COOKIE ECHO chunk with the same
+     Initiate Tag (i.e., Tag_A) or State Cookie shall be retransmitted and
+     the timer restarted.  This shall be repeated Max.Init.Retransmits
+     times before "A" considers "Z" unreachable and reports the failure to
+     its upper layer (and thus the association enters the CLOSED state).
+
+     When retransmitting the INIT, the endpoint MUST follow the rules
+     defined in Section 6.3 to determine the proper timer value.
+     */
+
+    @Override
+    protected Chunk[] iackDeal(InitAckChunk iack) {
+        Chunk[] ret = super.iackDeal(iack);
+        _stashCookieEcho = ret;
+        return ret;
+    }
+
+    @Override
+    public void associate() throws SctpPacketFormatException, IOException {
+        final SimpleSCTPTimer init = new SimpleSCTPTimer();
+        sendInit();
+        Runnable r = new Runnable() {
+            int retries = 0;
+
+            @Override
+            public void run() {
+                Log.debug("T1 init timer expired in state " + _state.name());
+
+                if ((_state == State.COOKIEECHOED) || (_state == State.COOKIEWAIT)) {
+                    try {
+                        if (_state == State.COOKIEWAIT) {
+                            sendInit();
+                        } else { // COOKIEECHOED
+                            send(_stashCookieEcho);
+                        }
+                    } catch (Exception ex) {
+                        Log.error("Cant send Init/cookie retry " + retries + " because " + ex.toString());
+                    }
+                    retries++;
+                    if (retries < MAX_INIT_RETRANS) {
+                        init.setRunnable(this, _rto);
+                    }
+                } else {
+                    Log.debug("T1 init timer expired with nothing to do");
+                }
+            }
+        };
+        init.setRunnable(r, getT1());
     }
 
     public SCTPStream mkStream(int id) {
@@ -625,7 +680,10 @@ public class ThreadedAssociation extends Association implements Runnable {
             Log.debug("Try again in a while  ");
 
         }
+    }
 
+    private long getT1() {
+        return this._rto * 10;
     }
 
 }
