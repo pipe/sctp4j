@@ -21,6 +21,7 @@ import com.ipseorama.base.certHolders.JksCertMaker;
 import com.phono.srtplight.Log;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableEntryException;
@@ -33,7 +34,9 @@ import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 import javax.json.JsonValue;
+import org.ice4j.TransportAddress;
 import org.ice4j.ice.Candidate;
+import org.ice4j.ice.CandidateType;
 import org.ice4j.ice.LocalCandidate;
 import org.ice4j.ice.harvest.TrickleCallback;
 
@@ -150,7 +153,7 @@ public class IceConnectJSON extends IceConnect {
                 JsonArray candies = ((JsonObject) content).getJsonArray("candidates");
                 for (JsonValue v_candy : candies) {
                     JsonObject jcandy = (JsonObject) v_candy;
-                    addCandidate(jcandy.getString("foundation"), jcandy.getString("component"), jcandy.getString("protocol"), jcandy.getString("priority"), jcandy.getString("ip"), jcandy.getString("port"), jcandy.getString("type"));
+                    addJasonCandy(jcandy);
                 }
             }
         }
@@ -159,14 +162,26 @@ public class IceConnectJSON extends IceConnect {
             throw new IOException("No fingerptint set");
         }
     }
-
+    private void addJasonCandy(JsonObject jcandy){
+        addCandidate(jcandy.getString("foundation"),
+                jcandy.getString("component"),
+                jcandy.getString("protocol"),
+                jcandy.getString("priority"),
+                jcandy.getString("ip"),
+                jcandy.getString("port"),
+                jcandy.getString("type"),
+                jcandy.getString("raddr",null),
+                jcandy.getString("rport",null)
+        );
+    }
+    
     public void addRemoteCandidate(JsonObject message) throws IOException {
         String session = message.getString("session");
         String to = message.getString("to");
         String type = message.getString("type");
         if (to.equals(_to) && (type.equalsIgnoreCase("candidate"))) {
             JsonObject jcandy = message.getJsonObject("candidate");
-            addCandidate(jcandy.getString("foundation"), jcandy.getString("component"), jcandy.getString("protocol"), jcandy.getString("priority"), jcandy.getString("ip"), jcandy.getString("port"), jcandy.getString("type"));
+            addJasonCandy(jcandy);
         }
     }
 
@@ -181,7 +196,7 @@ public class IceConnectJSON extends IceConnect {
     }
 
     public JsonObjectBuilder mkCandidateJson(Candidate candy) {
-        return Json.createObjectBuilder()
+        JsonObjectBuilder ret = Json.createObjectBuilder()
                 .add("foundation", ""+candy.getFoundation())
                 .add("component", "" + candy.getParentComponent().getComponentID())
                 .add("protocol", candy.getTransport().toString())
@@ -190,6 +205,12 @@ public class IceConnectJSON extends IceConnect {
                 .add("port", ""+candy.getTransportAddress().getPort())
                 .add("type", candy.getType().toString())
                 .add("generation", "0");
+        TransportAddress relAddr = candy.getRelatedAddress();
+        if(relAddr != null)
+        {
+            ret= ret.add("raddr", relAddr.getHostAddress()).add("rport" , ""+relAddr.getPort());
+        }
+        return ret;
     }
 
     public JsonArrayBuilder mkCandidates() {

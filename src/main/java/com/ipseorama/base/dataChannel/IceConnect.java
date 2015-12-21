@@ -66,18 +66,20 @@ public class IceConnect implements PropertyChangeListener {
     public void setAssociationListener(AssociationListener al) {
         this._al = al;
     }
+
     IceConnect(int port) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
-        this(port,null);
+        this(port, null);
     }
-    IceConnect(int port,CertHolder certH) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
-        _cert = (certH == null) ? new JksCertHolder():certH ;
+
+    IceConnect(int port, CertHolder certH) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
+        _cert = (certH == null) ? new JksCertHolder() : certH;
         _ffp = null;
         _localAgent = createAgent(true);
         _localAgent.addStateChangeListener(this);
-        _localAgent.setTa(250);
+        _localAgent.setTa(2500);
 
         _localAgent.setNominationStrategy(
-                NominationStrategy.NOMINATE_FIRST_HOST_OR_REFLEXIVE_VALID);
+                NominationStrategy.NOMINATE_FIRST_VALID);
 
         //let them fight ... fights forge character.
         _localAgent.setControlling(!this._dtlsClientRole);
@@ -243,8 +245,8 @@ public class IceConnect implements PropertyChangeListener {
                         if (lds.isBound()) {
                             Log.debug("local ds bound to " + lds.getLocalSocketAddress());
                         } else {
-                            Log.debug("local ds not bound bailing..." + lds.getLocalSocketAddress());
-                            break;
+                            Log.debug("local ds not bound. Relay?" + lds.getLocalSocketAddress());
+                            //break;
                         }
                         if (rta != null) {
                             Log.debug("remote transport address " + rta.toString());
@@ -271,7 +273,7 @@ public class IceConnect implements PropertyChangeListener {
 
                                     @Override
                                     public Association makeAssociation(DTLSTransport trans, AssociationListener li) {
-                                        return new LeakyAssociation(trans,li);
+                                        return new LeakyAssociation(trans, li);
                                     }
                                 };
                             } else {
@@ -283,7 +285,7 @@ public class IceConnect implements PropertyChangeListener {
 
                                     @Override
                                     public Association makeAssociation(DTLSTransport trans, AssociationListener li) {
-                                        return new LeakyAssociation(trans,li);
+                                        return new LeakyAssociation(trans, li);
                                     }
                                 };
                             }
@@ -320,7 +322,7 @@ public class IceConnect implements PropertyChangeListener {
 
         // STUN
         StunCandidateHarvester stunHarv = new StunCandidateHarvester(
-                new TransportAddress("stun.l.google.com", 19302, Transport.UDP));
+                new TransportAddress("146.148.121.175", 3478, Transport.UDP));
 
         agent.addCandidateHarvester(stunHarv);
         // TURN
@@ -377,7 +379,7 @@ public class IceConnect implements PropertyChangeListener {
         return stream;
     }
 
-    void addCandidate(String foundation, String component, String protocol, String priority, String ip, String port, String type) {
+    void addCandidate(String foundation, String component, String protocol, String priority, String ip, String port, String type, String raddr, String rport) {
         IceMediaStream localStream = getStream("data");
         List<Component> localComponents = localStream.getComponents();
         int cid = Integer.parseInt(component);
@@ -387,19 +389,37 @@ public class IceConnect implements PropertyChangeListener {
             if (cid == id) {
                 int iport = Integer.parseInt(port);
                 long lpriority = Long.parseLong(priority);
-
+                RemoteCandidate relatedCandidate = null;
                 TransportAddress ta = new TransportAddress(ip, iport, Transport.parse(protocol));
+                if ((rport != null) && (raddr != null)) {
+
+                    int riport = Integer.parseInt(rport);
+                    TransportAddress rta = new TransportAddress(raddr, riport, Transport.parse(protocol));
+                    relatedCandidate = localComponent.findRemoteCandidate(rta);
+
+                }
                 // localComponent.setDefaultRemoteCandidate(remoteComponent.getDefaultCandidate());
-                localComponent.addRemoteCandidate(new RemoteCandidate(
+                RemoteCandidate nrc = new RemoteCandidate(
                         ta,
                         localComponent,
                         CandidateType.parse(type),
                         foundation,
                         lpriority,
-                        null));
+                        relatedCandidate);
+                if (_iceStarted) {
+                    Log.debug("adding update remote " + nrc.toString() + " to local " + localComponent.toString());
+                    localComponent.addUpdateRemoteCandidates(nrc);
+                    localComponent.updateRemoteCandidates();
+                } else {
+                    Log.debug("adding remote " + nrc.toShortString() + " to local " + localComponent.toShortString());
+                    localComponent.addRemoteCandidate(nrc);
+                }
                 if (protocol.equalsIgnoreCase("udp")) {
                     rc = true;
                 }
+                
+            } else {
+                Log.verb("component Ids dont match " + cid + " != " + id + " ignoring...");
             }
         }
         if (rc) {
@@ -429,7 +449,7 @@ public class IceConnect implements PropertyChangeListener {
         try {
             IceConnect ice = new IceConnect(12345);
             ice.buildIce("wbrUTaHy7SNtu20y", "jg/ezzHpJSLGJvUB3N8XwXj9");
-            ice.addCandidate("2169522962", "1", "udp", "1509957375", "192.67.4.33", "54321", "host");
+            ice.addCandidate("2169522962", "1", "udp", "1509957375", "192.67.4.33", "54321", "host", null, null);
             Log.debug("local ufrag " + ice.getUfrag());
             Log.debug("local pass " + ice.getPass());
             List<Candidate> candies = ice.getCandidates();
