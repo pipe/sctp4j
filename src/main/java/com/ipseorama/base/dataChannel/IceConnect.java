@@ -76,7 +76,7 @@ public class IceConnect implements PropertyChangeListener {
         _ffp = null;
         _localAgent = createAgent(true);
         _localAgent.addStateChangeListener(this);
-        _localAgent.setTa(2500);
+        _localAgent.setTa(250);
 
         _localAgent.setNominationStrategy(
                 NominationStrategy.NOMINATE_FIRST_VALID);
