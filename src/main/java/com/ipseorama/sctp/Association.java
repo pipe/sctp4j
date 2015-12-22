@@ -46,6 +46,8 @@ abstract public class Association {
 
     public abstract void associate() throws SctpPacketFormatException, IOException;
 
+
+
     /**
      * <code>
      *                     -----          -------- (from any state)
@@ -234,7 +236,16 @@ abstract public class Association {
             Log.error("Created an Associaction with a null transport somehow...");
         }
     }
-
+    
+    /**
+     * override this and return false to disable the bi-directionalinit gamble that webRTC expects.
+     * Only do this in testing. Production should have it enabled since it also provides glare resolution.
+     * @return true 
+     */
+    public  boolean doBidirectionalInit() {
+        return true;
+    }
+    
     public void send(Chunk c[]) throws SctpPacketFormatException, IOException {
         if ((c != null) && (c.length > 0)) {
             ByteBuffer obb = mkPkt(c);
@@ -245,6 +256,21 @@ abstract public class Association {
         }
     }
 
+    /**
+     * decide if we want to do the webRTC specified bidirectional init 
+     * _very_ useful to be able to switch this off for testing 
+     * @return 
+     */
+    private boolean acceptableStateForInboundInit(){
+        boolean ret = false;
+        if (doBidirectionalInit()) {
+            ret = ((_state == State.CLOSED) || (_state == State.COOKIEWAIT) || (_state == State.COOKIEECHOED)) ;
+        }else {
+            ret = (_state == State.CLOSED);
+        }
+        return ret;
+    }
+    
     /**
      *
      * @param c - Chunk to be processed
@@ -260,11 +286,11 @@ abstract public class Association {
         Chunk[] reply = null;
         switch (ty) {
             case Chunk.INIT:
-                if ((_state == State.CLOSED) || (_state == State.COOKIEWAIT) || (_state == State.COOKIEECHOED)) {
+                if (acceptableStateForInboundInit()){
                     InitChunk init = (InitChunk) c;
                     reply = inboundInit(init);
                 } else {
-                    Log.debug("Got an INIT when state was " + _state.name() + " - ignoring it");
+                    Log.debug("Got an INIT when state was " + _state.name() + " - ignoring it for now ");
                 }
                 break;
             case Chunk.INITACK:
@@ -412,6 +438,20 @@ abstract public class Association {
         iack.getInitialTSN();
         iack.getNumInStreams();
         iack.getNumOutStreams();
+        /* 
+        NOTE: TO DO - this is a protocol violation - this should be done with
+        multiple TCBS and set in cookie echo 
+        NOT HERE
+        */
+        
+        _peerVerTag = iack.getInitiateTag(); 
+        _winCredit = iack.getAdRecWinCredit();
+        _farTSN = iack.getInitialTSN() - 1;
+        _maxOutStreams = Math.min(iack.getNumInStreams(), MAXSTREAMS);
+        _maxInStreams = Math.min(iack.getNumOutStreams(), MAXSTREAMS);
+        
+        
+        
         iack.getSupportedExtensions(_supportedExtensions);
         byte[] data = iack.getCookie();
         CookieEchoChunk ce = new CookieEchoChunk();

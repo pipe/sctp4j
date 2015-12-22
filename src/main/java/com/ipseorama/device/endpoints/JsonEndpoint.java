@@ -43,6 +43,7 @@ public abstract class JsonEndpoint implements SCTPStreamListener , JsonFace{
             sendJson(reply);
         } catch (Exception ex) {
             Log.error("cant deal with Json message to " + s.getLabel());
+            ex.printStackTrace();
         }
     }
 
