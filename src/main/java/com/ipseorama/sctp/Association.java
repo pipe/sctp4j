@@ -708,6 +708,7 @@ abstract public class Association {
                     throw new StreamNumberInUseException();
                 }
                 sout = mkStream(sno);
+                sout.setLabel(label);
                 _streams.put(sno, sout);
             }
             DataChunk dcopen = DataChunk.mkDCOpen(label);
