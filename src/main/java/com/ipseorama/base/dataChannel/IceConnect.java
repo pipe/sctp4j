@@ -10,6 +10,7 @@ import com.ipseorama.base.certHolders.JksCertHolder;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.AssociationListener;
 import com.ipseorama.sctp.leakey.LeakyAssociation;
+import com.ipseorama.sctp.small.ThreadedAssociation;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import org.ice4j.Transport;
@@ -273,7 +274,7 @@ public class IceConnect implements PropertyChangeListener {
 
                                     @Override
                                     public Association makeAssociation(DTLSTransport trans, AssociationListener li) {
-                                        return new LeakyAssociation(trans, li);
+                                        return new ThreadedAssociation(trans, li);
                                     }
                                 };
                             } else {
@@ -285,7 +286,7 @@ public class IceConnect implements PropertyChangeListener {
 
                                     @Override
                                     public Association makeAssociation(DTLSTransport trans, AssociationListener li) {
-                                        return new LeakyAssociation(trans, li);
+                                        return new ThreadedAssociation (trans, li);
                                     }
                                 };
                             }
