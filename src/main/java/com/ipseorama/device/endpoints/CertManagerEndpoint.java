@@ -32,12 +32,12 @@ public class CertManagerEndpoint extends JsonEndpoint {
     public JsonObject onJsonMessage(JsonObject messj) {
         JsonObjectBuilder ret = Json.createObjectBuilder();
         String action = messj.getString("action");
-        String certb64 = messj.getString("cert",null);
-	Certificate cert = null;
-	if (certb64 != null){
-             byte[] certb = biz.source_code.Base64Coder.decode(certb64);
-             cert = org.bouncycastle.asn1.x509.Certificate.getInstance(certb);
-	}
+        String certb64 = messj.getString("cert", null);
+        Certificate cert = null;
+        if (certb64 != null) {
+            byte[] certb = biz.source_code.Base64Coder.decode(certb64);
+            cert = org.bouncycastle.asn1.x509.Certificate.getInstance(certb);
+        }
         String id = messj.getString("id");
         try {
             switch (action) {
@@ -48,6 +48,9 @@ public class CertManagerEndpoint extends JsonEndpoint {
                     _cm.putFriendCert(id, cert);
                     break;
                 case "shun":
+                    if (id.equalsIgnoreCase("master")) {
+                        throw new Exception("Friends are not masters");
+                    }
                     _cm.removeFriendCert(id, cert);
                     break;
                 case "list":
