@@ -32,10 +32,13 @@ import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.bouncycastle.crypto.tls.DTLSTransport;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.ice4j.ice.Candidate;
 import org.ice4j.ice.CandidatePair;
+import org.ice4j.ice.CandidatePairState;
 import org.ice4j.ice.CandidateType;
 import org.ice4j.ice.Component;
 import org.ice4j.ice.IceProcessingState;
@@ -85,7 +88,6 @@ public class IceConnect implements PropertyChangeListener {
         //let them fight ... fights forge character.
         _localAgent.setControlling(!this._dtlsClientRole);
         _localAgent.setPerformConsentFreshness(true);
-
         //STREAMS
         createStream(port, "data", _localAgent);
 
@@ -210,7 +212,18 @@ public class IceConnect implements PropertyChangeListener {
     }
 
     public DatagramTransport mkTransport(DatagramSocket lds, TransportAddress rta) {
-        return new QueuingDatagramTransport(lds, rta);
+        final IceConnect ic = this;
+        return new QueuingDatagramTransport(lds, rta) {
+            @Override
+            public void close() throws IOException {
+                Log.debug("close called on Datagram transport");
+                //- probably closed due to a dtls alert -
+                //- in which case kill the association and dump the data
+                //- we shouldn't expect any progress from here on out....
+                super.close();
+                ic.freeAgent();
+            }
+        };
     }
 
     @Override
@@ -226,7 +239,7 @@ public class IceConnect implements PropertyChangeListener {
                         IceMediaStream s = getStream("data");
 
                         Component comp = s.getComponent(1);
-                        CandidatePair cp = comp.getSelectedPair();
+                        final CandidatePair cp = comp.getSelectedPair();
 
                         IceSocketWrapper isw = cp.getIceSocketWrapper();
                         TransportAddress rta = cp.getRemoteCandidate().getTransportAddress();
@@ -260,7 +273,32 @@ public class IceConnect implements PropertyChangeListener {
                             break;
                         }
                         try {
-                            DatagramTransport ds = mkTransport(lds, rta);
+                            final DatagramTransport ds = mkTransport(lds, rta);
+                            PropertyChangeListener pcl = new PropertyChangeListener() {
+                                @Override
+                                public void propertyChange(PropertyChangeEvent evt) {
+                                    Log.verb("pce on candidate pair " + evt.toString());
+                                    CandidatePair src = (CandidatePair) evt.getSource();
+                                    if ((src == cp) && (IceMediaStream.PROPERTY_PAIR_STATE_CHANGED.equals(evt.getPropertyName()))) {
+                                        CandidatePairState oldv = (CandidatePairState) evt.getOldValue();
+                                        CandidatePairState newv = (CandidatePairState) evt.getNewValue();
+                                        if ((oldv == CandidatePairState.SUCCEEDED) && (newv == CandidatePairState.FAILED)) {
+                                            Log.debug("Selected ICE pair newly failed - closing Transport ");
+                                            try {
+                                                ds.close();
+                                                // todo - really we should look if there is a new selected candidate
+                                                // if there is we should plumb that into the dtls layer (invisibly)
+                                                // but we dont. Yet.
+                                            } catch (IOException ex) {
+                                                Log.debug("can't close transport: " + ex.getMessage());
+                                            }
+                                        }
+                                    } else {
+                                        Log.debug("Not the ICE pair we are looking for");
+                                    }
+                                }
+                            };
+                            s.addPairChangeListener(pcl);
                             Log.debug("DTLS role " + (_dtlsClientRole ? "client" : "server"));
                             final boolean offerer = _offerer;
                             Log.debug("SDP role  " + (_offerer ? "offer" : "answer"));
@@ -286,7 +324,7 @@ public class IceConnect implements PropertyChangeListener {
 
                                     @Override
                                     public Association makeAssociation(DTLSTransport trans, AssociationListener li) {
-                                        return new ThreadedAssociation (trans, li);
+                                        return new ThreadedAssociation(trans, li);
                                     }
                                 };
                             }
@@ -418,7 +456,7 @@ public class IceConnect implements PropertyChangeListener {
                 if (protocol.equalsIgnoreCase("udp")) {
                     rc = true;
                 }
-                
+
             } else {
                 Log.verb("component Ids dont match " + cid + " != " + id + " ignoring...");
             }
@@ -465,6 +503,7 @@ public class IceConnect implements PropertyChangeListener {
     }
 
     public void freeAgent() {
+        Log.debug("Dumping agent - someone shutdown...");
         if (_localAgent != null) {
             _localAgent.free();
             _localAgent = null;

@@ -18,7 +18,6 @@
 package com.ipseorama.sctp;
 
 import com.ipseorama.sctp.messages.exceptions.UnreadyAssociationException;
-import com.ipseorama.sctp.messages.exceptions.StaleCookieException;
 import com.ipseorama.base.dataChannel.DECP.DCOpen;
 import com.ipseorama.sctp.messages.*;
 
@@ -27,6 +26,7 @@ import com.ipseorama.sctp.messages.params.StaleCookieError;
 import com.ipseorama.sctp.small.BlockingSCTPStream;
 
 import com.phono.srtplight.Log;
+import java.io.EOFException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
@@ -35,7 +35,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Set;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 
 /**
@@ -45,8 +44,6 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
 abstract public class Association {
 
     public abstract void associate() throws SctpPacketFormatException, IOException;
-
-
 
     /**
      * <code>
@@ -188,6 +185,7 @@ abstract public class Association {
     }
 
     void startRcv() {
+        final Association me = this;
         Runnable r = new Runnable() {
             @Override
             public void run() {
@@ -207,11 +205,13 @@ abstract public class Association {
 
                     _transp.close();
 
+                } catch (java.io.EOFException eof) {
+                    unexpectedClose(eof);
                 } catch (Exception ex) {
+                    Log.debug("Association rcv failed");
                     ex.printStackTrace();
                 }
             }
-
         };
         _rcv = new Thread(r);
         _rcv.start();
@@ -236,16 +236,18 @@ abstract public class Association {
             Log.error("Created an Associaction with a null transport somehow...");
         }
     }
-    
+
     /**
-     * override this and return false to disable the bi-directionalinit gamble that webRTC expects.
-     * Only do this in testing. Production should have it enabled since it also provides glare resolution.
-     * @return true 
+     * override this and return false to disable the bi-directionalinit gamble
+     * that webRTC expects. Only do this in testing. Production should have it
+     * enabled since it also provides glare resolution.
+     *
+     * @return true
      */
-    public  boolean doBidirectionalInit() {
+    public boolean doBidirectionalInit() {
         return true;
     }
-    
+
     public void send(Chunk c[]) throws SctpPacketFormatException, IOException {
         if ((c != null) && (c.length > 0)) {
             ByteBuffer obb = mkPkt(c);
@@ -257,20 +259,21 @@ abstract public class Association {
     }
 
     /**
-     * decide if we want to do the webRTC specified bidirectional init 
-     * _very_ useful to be able to switch this off for testing 
-     * @return 
+     * decide if we want to do the webRTC specified bidirectional init _very_
+     * useful to be able to switch this off for testing
+     *
+     * @return
      */
-    private boolean acceptableStateForInboundInit(){
+    private boolean acceptableStateForInboundInit() {
         boolean ret = false;
         if (doBidirectionalInit()) {
-            ret = ((_state == State.CLOSED) || (_state == State.COOKIEWAIT) || (_state == State.COOKIEECHOED)) ;
-        }else {
+            ret = ((_state == State.CLOSED) || (_state == State.COOKIEWAIT) || (_state == State.COOKIEECHOED));
+        } else {
             ret = (_state == State.CLOSED);
         }
         return ret;
     }
-    
+
     /**
      *
      * @param c - Chunk to be processed
@@ -286,7 +289,7 @@ abstract public class Association {
         Chunk[] reply = null;
         switch (ty) {
             case Chunk.INIT:
-                if (acceptableStateForInboundInit()){
+                if (acceptableStateForInboundInit()) {
                     InitChunk init = (InitChunk) c;
                     reply = inboundInit(init);
                 } else {
@@ -336,7 +339,11 @@ abstract public class Association {
         if (reply != null) {
             // theoretically could be multiple DATA in a single packet - 
             // we'd send multiple SACKs in reply - ToDo fix that
-            send(reply);
+            try {
+                send(reply);
+            } catch (java.io.EOFException end) {
+                unexpectedClose(end);
+            }
         }
         if ((_state == State.ESTABLISHED) && (oldState != State.ESTABLISHED)) {
             if (null != _al) {
@@ -428,7 +435,11 @@ abstract public class Association {
         Chunk[] s = new Chunk[1];
         s[0] = c;
         this._state = State.COOKIEWAIT;
-        this.send(s); // todo need timer here.....
+        try {
+            this.send(s);
+        } catch (java.io.EOFException end) {
+            unexpectedClose(end);
+        } // todo need timer here.....
     }
 
     protected Chunk[] iackDeal(InitAckChunk iack) {
@@ -439,19 +450,17 @@ abstract public class Association {
         iack.getNumInStreams();
         iack.getNumOutStreams();
         /* 
-        NOTE: TO DO - this is a protocol violation - this should be done with
-        multiple TCBS and set in cookie echo 
-        NOT HERE
-        */
-        
-        _peerVerTag = iack.getInitiateTag(); 
+         NOTE: TO DO - this is a protocol violation - this should be done with
+         multiple TCBS and set in cookie echo 
+         NOT HERE
+         */
+
+        _peerVerTag = iack.getInitiateTag();
         _winCredit = iack.getAdRecWinCredit();
         _farTSN = iack.getInitialTSN() - 1;
         _maxOutStreams = Math.min(iack.getNumInStreams(), MAXSTREAMS);
         _maxInStreams = Math.min(iack.getNumOutStreams(), MAXSTREAMS);
-        
-        
-        
+
         iack.getSupportedExtensions(_supportedExtensions);
         byte[] data = iack.getCookie();
         CookieEchoChunk ce = new CookieEchoChunk();
@@ -619,7 +628,7 @@ abstract public class Association {
             rep[0] = ack;
 
         } else {
-            Log.debug("got a dcep ack for "+ s.getLabel());
+            Log.debug("got a dcep ack for " + s.getLabel());
             SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
             s.setBehave(behave);
         }
@@ -729,16 +738,19 @@ abstract public class Association {
     public abstract void enqueue(DataChunk d);
 
     public abstract SCTPStream mkStream(int id);
-    
+
     public SCTPStream mkStream(String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
         int n = 1;
         int tries = this._maxOutStreams;
         do {
-            n=_random.nextInt(this._maxOutStreams);
-            if (--tries < 0) throw new StreamNumberInUseException();
+            n = _random.nextInt(this._maxOutStreams);
+            if (--tries < 0) {
+                throw new StreamNumberInUseException();
+            }
         } while (_streams.containsKey(new Integer(n)));
-        return mkStream(n,label);
+        return mkStream(n, label);
     }
+
     public SCTPStream mkStream(int sno, String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
         SCTPStream sout;
         if (canSend()) {
@@ -755,7 +767,11 @@ abstract public class Association {
             sout.outbound(dcopen);
             dcopen.setTsn(_nearTSN++);
             Chunk[] hack = {dcopen};
-            send(hack);
+            try {
+                send(hack);
+            } catch (java.io.EOFException end) {
+                unexpectedClose(end);
+            }
         } else {
             throw new UnreadyAssociationException();
         }
@@ -778,6 +794,12 @@ abstract public class Association {
                 ok = false;
         }
         return ok;
+    }
+
+    protected void unexpectedClose(EOFException end) {
+        _rcv = null;
+        _al.onDisAssociated(this);
+        _state = State.CLOSED;
     }
 
     abstract public void sendAndBlock(SCTPMessage m) throws Exception;

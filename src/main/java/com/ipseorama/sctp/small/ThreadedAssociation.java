@@ -28,6 +28,7 @@ import com.ipseorama.sctp.messages.InitChunk;
 import com.ipseorama.sctp.messages.SackChunk;
 import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
 import com.phono.srtplight.Log;
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -180,6 +181,8 @@ public class ThreadedAssociation extends Association implements Runnable {
                         } else { // COOKIEECHOED
                             send(_stashCookieEcho);
                         }
+                    } catch (java.io.EOFException end) {
+                        unexpectedClose(end);
                     } catch (Exception ex) {
                         Log.error("Cant send Init/cookie retry " + retries + " because " + ex.toString());
                     }
@@ -226,6 +229,8 @@ public class ThreadedAssociation extends Association implements Runnable {
                 }
             } catch (SctpPacketFormatException ex) {
                 Log.error("badly formatted chunk " + d.toString());
+            } catch (java.io.EOFException end) {
+                unexpectedClose(end);
             } catch (IOException ex) {
                 Log.error("Can not send chunk " + d.toString());
             }
@@ -630,55 +635,60 @@ public class ThreadedAssociation extends Association implements Runnable {
     // timer goes off,
     @Override
     public void run() {
-        long now = System.currentTimeMillis();
-        Log.debug("retry timer went off at " + now);
-        ArrayList<DataChunk> dcs = new ArrayList();
-        int space = _transpMTU;
-        boolean resetTimer = false;
-        synchronized (_inFlight) {
-            for (Long k : _inFlight.keySet()) {
-                DataChunk d = _inFlight.get(k);
-                if (d.getGapAck()) {
-                    Log.debug("skipping gap-acked tsn " + d.getTsn());
-                    continue;
-                }
-                if (d.getRetryTime() <= now) {
-                    dcs.add(d);
-                    d.setRetryTime(now + getT3() - 1);
-                    space -= d.getChunkLength();
-                    Log.debug("available space in pkt is " + space);
-                    if (space <= 0) {
-                        resetTimer = true;
-                        break;
+        if (canSend()) {
+            long now = System.currentTimeMillis();
+            Log.debug("retry timer went off at " + now);
+            ArrayList<DataChunk> dcs = new ArrayList();
+            int space = _transpMTU;
+            boolean resetTimer = false;
+            synchronized (_inFlight) {
+                for (Long k : _inFlight.keySet()) {
+                    DataChunk d = _inFlight.get(k);
+                    if (d.getGapAck()) {
+                        Log.debug("skipping gap-acked tsn " + d.getTsn());
+                        continue;
                     }
-                } else {
-                    Log.debug("retry not yet due for  " + d.toString());
-                    resetTimer = true;
+                    if (d.getRetryTime() <= now) {
+                        dcs.add(d);
+                        d.setRetryTime(now + getT3() - 1);
+                        space -= d.getChunkLength();
+                        Log.debug("available space in pkt is " + space);
+                        if (space <= 0) {
+                            resetTimer = true;
+                            break;
+                        }
+                    } else {
+                        Log.debug("retry not yet due for  " + d.toString());
+                        resetTimer = true;
+                    }
                 }
             }
-        }
-        if (!dcs.isEmpty()) {
-            Comparator<? super DataChunk> dcc = dcs.get(0);
-            Collections.sort(dcs, dcc);
-            DataChunk[] da = new DataChunk[dcs.size()];
-            int i = 0;
-            for (DataChunk d : dcs) {
-                da[i++] = d;
+            if (!dcs.isEmpty()) {
+                Comparator<? super DataChunk> dcc = dcs.get(0);
+                Collections.sort(dcs, dcc);
+                DataChunk[] da = new DataChunk[dcs.size()];
+                int i = 0;
+                for (DataChunk d : dcs) {
+                    da[i++] = d;
+                }
+                resetTimer = true;
+                try {
+                    Log.debug("Sending retry for  " + da.length + " data chunks");
+                    this.send(da);
+                } catch (java.io.EOFException end) {
+                    unexpectedClose(end);
+                    resetTimer = false;
+                } catch (Exception ex) {
+                    Log.error("Cant send retry - eek " + ex.toString());
+                }
+            } else {
+                Log.debug("Nothing to do ");
             }
-            resetTimer = true;
-            try {
-                Log.debug("Sending retry for  " + da.length + " data chunks");
-                this.send(da);
-            } catch (Exception ex) {
-                Log.error("Cant send retry - eek " + ex.toString());
-            }
-        } else {
-            Log.debug("Nothing to do ");
-        }
-        if (resetTimer) {
-            _timer.setRunnable(this, getT3());
-            Log.debug("Try again in a while  ");
+            if (resetTimer) {
+                _timer.setRunnable(this, getT3());
+                Log.debug("Try again in a while  ");
 
+            }
         }
     }
 

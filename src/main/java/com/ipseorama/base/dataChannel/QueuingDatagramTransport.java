@@ -84,26 +84,35 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
                 Log.debug("problem in running recv thread " + ex.getMessage());
             }
         }
-
+        Log.debug("shutdown - rcv thread finishing");
     }
 
     public int receive(byte[] buf, int off, int len, int waitMillis) throws IOException {
         int ret = 0;
-        try {
-            Log.debug("recv ");
-            byte pkt[] = _packetQueue.poll(waitMillis, TimeUnit.MILLISECONDS);
-            if (pkt != null) {
-                ret = Math.min(len, pkt.length);
-                System.arraycopy(pkt, 0, buf, off, ret);
+        if (!_isShutdown || (_packetQueue.peek() != null)) {
+            try {
+                Log.debug("recv ");
+                byte pkt[] = _packetQueue.poll(waitMillis, TimeUnit.MILLISECONDS);
+                if (pkt != null) {
+                    ret = Math.min(len, pkt.length);
+                    System.arraycopy(pkt, 0, buf, off, ret);
+                }
+            } catch (InterruptedException ex) {
+                Log.debug("recv interrupted ");
             }
-        } catch (InterruptedException ex) {
-            Log.debug("recv interrupted ");
+        } else {
+            Log.debug("Transport  shutdown - throw exception.");
+            throw new java.io.EOFException("Transport was shutdown.");
         }
         return ret;
     }
 
     @Override
     public void send(byte[] buf, int off, int len) throws IOException {
+        if (_isShutdown) {
+            Log.debug("Transport  shutdown - throw exception.");
+            throw new java.io.EOFException("transport shut.");
+        }
         DatagramPacket p = new DatagramPacket(buf, off, len, _dest);
         _ds.send(p);
         Log.debug("sent " + p.getLength() + " to " + _dest.toString());
@@ -112,9 +121,13 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
 
     @Override
     public void close() throws IOException {
+        if (_isShutdown) {
+            Log.debug("Transport  already shutdown - throw exception.");
+            throw new java.io.EOFException("transport shut.");
+        }
+        Log.debug("Transport  shutdown.");
         _isShutdown = true;
         _ds.close();
-
     }
 
     private boolean checkPacketIsDTLS(byte first) {
