@@ -17,6 +17,7 @@
  */
 package com.ipseorama.sctp;
 
+import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
 import com.ipseorama.sctp.messages.exceptions.UnreadyAssociationException;
 import com.ipseorama.base.dataChannel.DECP.DCOpen;
 import com.ipseorama.sctp.messages.*;

@@ -17,12 +17,18 @@
  */
 package com.ipseorama.sctp;
 
+import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
+import com.ipseorama.sctp.behave.WebRTCStreamBehaviour;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  *
@@ -40,24 +46,21 @@ public abstract class SCTPStream {
     Association _ass;
     private Integer _sno;
     private String _label;
-    private ArrayList<DataChunk> _stash;
+    private TreeSet<DataChunk> _stash;
     private char _outSeqno;
     private SCTPStreamListener _sl;
 
     public SCTPStream(Association a, Integer id) {
         _ass = a;
         _sno = id;
-        _stash = new ArrayList<DataChunk>();
-        _behave = new SCTPStreamBehaviour() {
+        Comparator<DataChunk> comp = new Comparator<DataChunk>(){
             @Override
-            public Chunk[] respond(SCTPStream s) {
-                return null; // so we don't respond until we see the open.
-            }
-
-            public void deliver(SCTPStream s, ArrayList<DataChunk> a, SCTPStreamListener l) {
-                Log.error("In default deliver - shouldn't happen - stream "+s.getLabel());
+            public int compare(DataChunk o1, DataChunk o2) {
+                return o1.getSSeqNo() - o2.getSSeqNo();
             }
         };
+        _stash = new TreeSet<DataChunk>(comp);
+        _behave = new WebRTCStreamBehaviour();
     }
 
     public void setLabel(String l) {

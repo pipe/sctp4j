@@ -18,8 +18,9 @@
 package com.ipseorama.base.dataChannel.DECP;
 
 import com.ipseorama.sctp.SCTPStream;
-import com.ipseorama.sctp.SCTPStreamBehaviour;
+import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
 import com.ipseorama.sctp.SCTPStreamListener;
+import com.ipseorama.sctp.behave.DCEPStreamBehaviour;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
 import com.ipseorama.sctp.messages.Packet;
@@ -27,6 +28,7 @@ import com.ipseorama.sctp.messages.exceptions.InvalidDataChunkException;
 import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Set;
 
 /**
  *
@@ -185,29 +187,7 @@ public class DCOpen {
         // return a SCTPStreamBehaviour that applies the reliability, priority and ordering as specified in the open.
         // for now just return a simple implementation
         Log.debug("Making a behaviour for dcep stream "+_label);
-        return new SCTPStreamBehaviour() {
-            @Override
-            public Chunk[] respond(SCTPStream a) {
-                Log.debug("in respond() for a opened stream " + a.getLabel());
-                return null;
-            }
-
-            @Override
-            public void deliver(SCTPStream s, ArrayList<DataChunk> a, SCTPStreamListener l) {
-                Log.debug("in deliver() for stream " + s.getLabel() + " with "+a.size()+ " chunks. ");
-                // strictly this should be looking at flags etc, and bundling the result into a message
-                for (DataChunk dc : a) {
-                    if (dc.getDCEP() != null) {
-                        Log.debug("in deliver() for a DCEP message " + dc.getDataAsString());
-                    } else {
-                        Log.debug("inbound data chunk is "+dc.toString());
-                        l.onMessage(s, dc.getDataAsString());
-                    }
-                }
-                a.clear();
-            }
-
-        };
+        return new DCEPStreamBehaviour() ;
     }
 
     public String getLabel() {

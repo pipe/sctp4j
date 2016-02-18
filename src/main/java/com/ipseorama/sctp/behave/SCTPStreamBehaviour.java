@@ -15,11 +15,15 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
-package com.ipseorama.sctp;
+package com.ipseorama.sctp.behave;
 
+import com.ipseorama.sctp.SCTPStream;
+import com.ipseorama.sctp.SCTPStreamListener;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.SortedSet;
 
 /**
  *
@@ -30,6 +34,6 @@ public interface SCTPStreamBehaviour {
     // Something has happend to the stream, this is our chance to respond.
     public Chunk[] respond(SCTPStream a);
 
-            public void deliver(SCTPStream s, ArrayList<DataChunk> a, SCTPStreamListener l) ;
+    public void deliver(SCTPStream s, SortedSet<DataChunk> a, SCTPStreamListener l) ;
 
 }

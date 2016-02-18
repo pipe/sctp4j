@@ -19,6 +19,11 @@ package com.ipseorama.sctp;
 
 import com.ipseorama.sctp.messages.DataChunk;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.NavigableMap;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 /**
  *
@@ -30,8 +35,9 @@ public class SCTPMessage {
     private final byte[] _data;
     private int _offset = 0;
     private int _pPid = 0;
-    private int _hiSeq; // note 
+    private int _hiSeq; // note do we need these ?
     private int _loSeq;
+    
     /**
      * Outbound message - note that we assume no one will mess with data between
      * calls to fill()
@@ -51,6 +57,40 @@ public class SCTPMessage {
         _pPid = DataChunk.WEBRTCSTRING;
     }
 
+    public SCTPMessage(SCTPStream s,SortedSet<DataChunk> chunks) {
+        _stream = s;
+        int tot = 0;
+        if ((chunks.first().getFlags() & DataChunk.BEGINFLAG) == 0){
+            throw new IllegalArgumentException("must start with 'start' chunk");
+        }
+        if ((chunks.last().getFlags() & DataChunk.ENDFLAG) == 0){
+            throw new IllegalArgumentException("must end with 'end' chunk");
+        }
+        int count = chunks.last().getSSeqNo() -chunks.first().getSSeqNo();
+        if (chunks.size() != count){
+            throw new IllegalArgumentException("chunk count is wrong "+chunks.size() +" vs "+count);
+        }
+        for (DataChunk dc:chunks){
+            tot += dc.getDataSize();
+        }
+        _data = new byte[tot];
+        int offs = 0;
+        for (DataChunk dc:chunks){
+            System.arraycopy(dc.getData(), 0, _data, offs, dc.getDataSize());
+            offs+= dc.getDataSize();
+        }
+    }
+
+    public SCTPMessage(SCTPStream s,DataChunk singleChunk) {
+        _stream = s;
+        int flags = singleChunk.getFlags();
+        if ((flags & singleChunk.SINGLEFLAG) > 0) {
+            _data = singleChunk.getData();
+        } else {
+            throw new IllegalArgumentException("must use a 'single' chunk");
+        }
+    }
+    
     public void setCompleteHandler(MessageCompleteHandler mch) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
@@ -59,6 +99,13 @@ public class SCTPMessage {
         return (_offset < _data.length);
     }
 
+
+    /**
+     * available datachunks are put here to be filled with data from this
+     * outbound message
+     *
+     * @param dc
+     */
     public void fill(DataChunk dc) {
         boolean last = false;
         boolean first = false;
@@ -79,31 +126,31 @@ public class SCTPMessage {
                 _offset += dsz;
                 first = true;
             }
+        } else // not first
+        if (remain <= dsz) {
+            // last chunk, this will all fit.
+            dc.setFlags(dc.ENDFLAG);
+            dc.setData(_data, _offset, remain);
+            _offset += remain; // should be _data_length now
+            last = true;
         } else {
-            // not first
-            if (remain <= dsz) {
-                // last chunk, this will all fit.
-                dc.setFlags(dc.ENDFLAG);
-                dc.setData(_data, _offset, remain);
-                _offset += remain; // should be _data_length now
-                last = true;
-            } else {
-                // middle chunk.
-                dc.setData(_data, _offset, dsz);
-                _offset += dsz;
-            }
+            // middle chunk.
+            dc.setData(_data, _offset, dsz);
+            _offset += dsz;
         }
         dc.setPpid(_pPid);
-        
+
         _stream.outbound(dc);
-        if (last){
+        if (last) {
             _hiSeq = dc.getSSeqNo();
         }
-        if (first){
+        if (first) {
             _loSeq = dc.getSSeqNo();
         }
     }
 
-
+    public byte[] getData() {
+        return _data;
+    }
 
 }
