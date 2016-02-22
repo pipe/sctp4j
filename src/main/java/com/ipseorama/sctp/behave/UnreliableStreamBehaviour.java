@@ -11,7 +11,6 @@ import com.ipseorama.sctp.SCTPStreamListener;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
 import java.util.ArrayList;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 

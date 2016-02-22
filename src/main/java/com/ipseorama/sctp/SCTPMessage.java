@@ -67,7 +67,7 @@ public class SCTPMessage {
             throw new IllegalArgumentException("must end with 'end' chunk");
         }
         int count = chunks.last().getSSeqNo() -chunks.first().getSSeqNo();
-        if (chunks.size() != count){
+        if (chunks.size() != count+1){
             throw new IllegalArgumentException("chunk count is wrong "+chunks.size() +" vs "+count);
         }
         for (DataChunk dc:chunks){
