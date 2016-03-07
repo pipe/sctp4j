@@ -91,7 +91,7 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
         int ret = 0;
         if (!_isShutdown || (_packetQueue.peek() != null)) {
             try {
-                Log.debug("recv ");
+                Log.debug("recv "+waitMillis);
                 byte pkt[] = _packetQueue.poll(waitMillis, TimeUnit.MILLISECONDS);
                 if (pkt != null) {
                     ret = Math.min(len, pkt.length);
@@ -99,6 +99,8 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
                 }
             } catch (InterruptedException ex) {
                 Log.debug("recv interrupted ");
+                ex.printStackTrace(); // remove this wart.
+                throw new java.io.InterruptedIOException(ex.getMessage());
             }
         } else {
             Log.debug("Transport  shutdown - throw exception.");
