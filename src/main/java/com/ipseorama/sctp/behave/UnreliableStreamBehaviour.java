@@ -22,7 +22,7 @@ public class UnreliableStreamBehaviour implements SCTPStreamBehaviour {
 
     @Override
     public Chunk[] respond(SCTPStream a) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return null; // nothing to say.
     }
 
     @Override

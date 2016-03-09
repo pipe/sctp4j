@@ -70,8 +70,13 @@ public class SCTPMessage {
         if (chunks.size() != count+1){
             throw new IllegalArgumentException("chunk count is wrong "+chunks.size() +" vs "+count);
         }
+        _pPid = chunks.first().getPpid();
         for (DataChunk dc:chunks){
             tot += dc.getDataSize();
+            if (_pPid != dc.getPpid()){
+                // aaagh 
+                throw new IllegalArgumentException("chunk has wrong ppid"+dc.getPpid() +" vs "+_pPid);
+            }
         }
         _data = new byte[tot];
         int offs = 0;

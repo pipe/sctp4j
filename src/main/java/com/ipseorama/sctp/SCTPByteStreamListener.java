@@ -22,7 +22,6 @@ package com.ipseorama.sctp;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-public interface SCTPStreamListener {
-    public void onMessage(SCTPStream s, String message);
-
+public interface SCTPByteStreamListener extends SCTPStreamListener{
+    public void onMessage(SCTPStream s, byte[] message);
 }

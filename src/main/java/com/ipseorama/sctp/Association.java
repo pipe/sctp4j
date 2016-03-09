@@ -553,6 +553,7 @@ abstract public class Association {
             _streams.put(sno, in);
         }
         Chunk[] repa;
+        // todo dcep logic belongs in behave - not here.
         if (dc.getDCEP() != null) {
             repa = dcepDeal(in, dc, dc.getDCEP());
             if (_al != null) {
@@ -610,7 +611,7 @@ abstract public class Association {
         rep.add(sack);
         return rep.toArray(dummy);
     }
-
+// todo should be in a behave block
     private Chunk[] dcepDeal(SCTPStream s, DataChunk dc, DCOpen dcep) {
         Chunk[] rep = null;
         Log.debug("dealing with a decp for stream " + dc.getDataAsString());
@@ -763,7 +764,7 @@ abstract public class Association {
                 sout = mkStream(sno);
                 sout.setLabel(label);
                 _streams.put(sno, sout);
-            }
+            }// todo - move this to behave
             DataChunk dcopen = DataChunk.mkDCOpen(label);
             sout.outbound(dcopen);
             dcopen.setTsn(_nearTSN++);

@@ -22,12 +22,7 @@ import com.ipseorama.sctp.behave.WebRTCStreamBehaviour;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
-import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
@@ -49,6 +44,7 @@ public abstract class SCTPStream {
     private TreeSet<DataChunk> _stash;
     private char _outSeqno;
     private SCTPStreamListener _sl;
+    private int _nextSeq;
 
     public SCTPStream(Association a, Integer id) {
         _ass = a;
@@ -128,5 +124,13 @@ public abstract class SCTPStream {
 
     public void close() {
         Log.debug("close() Not supported yet.");
+    }
+
+    public void setNextSeq(int expectedSeq) {
+        _nextSeq = expectedSeq;
+    }
+
+    public int getNextSeq() {
+        return _nextSeq;
     }
 }

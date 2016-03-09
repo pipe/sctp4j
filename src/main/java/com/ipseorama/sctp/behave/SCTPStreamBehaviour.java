@@ -21,8 +21,6 @@ import com.ipseorama.sctp.SCTPStream;
 import com.ipseorama.sctp.SCTPStreamListener;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
-import java.util.ArrayList;
-import java.util.Set;
 import java.util.SortedSet;
 
 /**
@@ -32,8 +30,11 @@ import java.util.SortedSet;
 public interface SCTPStreamBehaviour {
 
     // Something has happend to the stream, this is our chance to respond.
+    // typically this means sending nothing
     public Chunk[] respond(SCTPStream a);
 
+    // we have a sorted queue of datachunks for this stream to deliver
+    // according to the appropriate behaviour.
     public void deliver(SCTPStream s, SortedSet<DataChunk> a, SCTPStreamListener l) ;
 
 }

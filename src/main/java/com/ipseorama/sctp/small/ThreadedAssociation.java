@@ -242,7 +242,7 @@ public class ThreadedAssociation extends Association implements Runnable {
         while (m.hasMoreData()) {
             DataChunk dc = _freeBlocks.take();
             m.fill(dc);
-            // check rollover - will break at maxint.
+            // todo check rollover - will break at maxint.
             enqueue(dc);
         }
     }
