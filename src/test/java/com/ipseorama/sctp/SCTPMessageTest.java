@@ -154,7 +154,7 @@ public class SCTPMessageTest {
             instance.fill(dc);
             chunks.add(dc);
         }
-        double pktsz = chunks.first().getData().length;
+        double pktsz = chunks.first().getDataSize();
         int estimate = (int)Math.ceil(testString.length() / pktsz  ); 
         assertEquals(chunks.size(), estimate);
     }

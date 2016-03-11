@@ -100,7 +100,7 @@ public class UnreliableStreamBehaviourTest {
         ArrayList<String> result = new ArrayList<String>();
         result.add(testString);
         SCTPStreamListener l = new CheckingStreamListener(result);
-        UnreliableStreamBehaviour instance = new UnreliableStreamBehaviour();
+        UnorderedStreamBehaviour instance = new UnorderedStreamBehaviour();
         instance.deliver(s, stash, l);
         int remain = result.size();
         assertEquals(remain, 0);
@@ -139,7 +139,7 @@ public class UnreliableStreamBehaviourTest {
         ArrayList<String> result = new ArrayList<String>();
         result.add(testString);
         SCTPStreamListener l = new CheckingStreamListener(result);
-        UnreliableStreamBehaviour instance = new UnreliableStreamBehaviour();
+        UnorderedStreamBehaviour instance = new UnorderedStreamBehaviour();
         instance.deliver(s, stash, l);
         int remain = result.size();
         assertEquals(1, remain);
@@ -163,7 +163,7 @@ public class UnreliableStreamBehaviourTest {
             result.add(ts);
         }
         SCTPStreamListener l = new CheckingStreamListener(result);
-        UnreliableStreamBehaviour instance = new UnreliableStreamBehaviour();
+        UnorderedStreamBehaviour instance = new UnorderedStreamBehaviour();
         instance.deliver(s, stash, l);
 
         int remain = result.size();
@@ -216,7 +216,7 @@ public class UnreliableStreamBehaviourTest {
         }
         result.add(bs.toString());
         SCTPStreamListener l = new CheckingStreamListener(result);
-        UnreliableStreamBehaviour instance = new UnreliableStreamBehaviour();
+        UnorderedStreamBehaviour instance = new UnorderedStreamBehaviour();
         instance.deliver(s, stash, l);
 
         int remain = result.size();
@@ -253,7 +253,7 @@ public class UnreliableStreamBehaviourTest {
         }
 
         SCTPStreamListener l = new CheckingStreamListener(result);
-        UnreliableStreamBehaviour instance = new UnreliableStreamBehaviour();
+        UnorderedStreamBehaviour instance = new UnorderedStreamBehaviour();
 
         instance.deliver(s, stash, l);
 
@@ -318,7 +318,7 @@ public class UnreliableStreamBehaviourTest {
         }
 
         SCTPStreamListener l = new CheckingStreamListener(result);
-        UnreliableStreamBehaviour instance = new UnreliableStreamBehaviour();
+        UnorderedStreamBehaviour instance = new UnorderedStreamBehaviour();
         SortedSet<DataChunk> stash = new TreeSet(comp);
         while (all.size() > 0) {
             int v = rand.nextInt(all.size());

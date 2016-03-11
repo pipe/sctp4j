@@ -99,6 +99,7 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
                 }
             } catch (InterruptedException ex) {
                 Log.debug("recv interrupted ");
+                throw new java.io.InterruptedIOException(ex.getMessage());
             }
         } else {
             Log.debug("Transport  shutdown - throw exception.");

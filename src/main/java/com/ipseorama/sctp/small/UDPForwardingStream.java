@@ -8,7 +8,7 @@ package com.ipseorama.sctp.small;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.SCTPMessage;
 import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
-import com.ipseorama.sctp.behave.UnreliableStreamBehaviour;
+import com.ipseorama.sctp.behave.UnorderedStreamBehaviour;
 import com.phono.srtplight.Log;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -71,6 +71,6 @@ public class UDPForwardingStream extends BlockingSCTPStream implements Runnable 
     }
 
     private SCTPStreamBehaviour mkBehave() {
-        return new UnreliableStreamBehaviour();
+        return new UnorderedStreamBehaviour();
     }
 }

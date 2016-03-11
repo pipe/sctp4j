@@ -18,7 +18,7 @@ import java.util.TreeSet;
  *
  * @author tim
  */
-public class UnreliableStreamBehaviour implements SCTPStreamBehaviour {
+public class UnorderedStreamBehaviour implements SCTPStreamBehaviour {
 
     @Override
     public Chunk[] respond(SCTPStream a) {

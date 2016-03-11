@@ -17,8 +17,8 @@
  */
 package com.ipseorama.sctp;
 
+import com.ipseorama.sctp.behave.OrderedStreamBehaviour;
 import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
-import com.ipseorama.sctp.behave.WebRTCStreamBehaviour;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
@@ -56,7 +56,7 @@ public abstract class SCTPStream {
             }
         };
         _stash = new TreeSet<DataChunk>(comp);
-        _behave = new WebRTCStreamBehaviour();
+        _behave = new OrderedStreamBehaviour(); // default 'till we know different
     }
 
     public void setLabel(String l) {

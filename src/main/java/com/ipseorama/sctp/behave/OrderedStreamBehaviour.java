@@ -20,7 +20,7 @@ import java.util.TreeSet;
  *
  * @author tim
  */
-public class OrderedReliableStreamBehaviour implements SCTPStreamBehaviour {
+public class OrderedStreamBehaviour implements SCTPStreamBehaviour {
 
     @Override
     public void deliver(SCTPStream s, SortedSet<DataChunk> stash, SCTPStreamListener l) {

@@ -17,24 +17,21 @@
  */
 package com.ipseorama.base.dataChannel.DECP;
 
-import com.ipseorama.sctp.SCTPStream;
 import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
-import com.ipseorama.sctp.SCTPStreamListener;
 import com.ipseorama.sctp.behave.DCEPStreamBehaviour;
-import com.ipseorama.sctp.messages.Chunk;
-import com.ipseorama.sctp.messages.DataChunk;
+import com.ipseorama.sctp.behave.OrderedStreamBehaviour;
+import com.ipseorama.sctp.behave.UnorderedStreamBehaviour;
 import com.ipseorama.sctp.messages.Packet;
 import com.ipseorama.sctp.messages.exceptions.InvalidDataChunkException;
 import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Set;
 
 /**
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
 public class DCOpen {
+
     /*
      +------------------------------------------------+------+-----------+
      | Name                                           | Type | Reference |
@@ -50,13 +47,12 @@ public class DCOpen {
      | Unassigned                                     | rest |           |
      +------------------------------------------------+------+-----------+
      */
-
-    public final static int RELIABLE = 0x0;
-    public final static int PARTIAL_RELIABLE_REXMIT = 0x01;
-    public final static int PARTIAL_RELIABLE_REXMIT_UNORDERED = 0x81;
-    public final static int PARTIAL_RELIABLE_TIMED = 0x02;
-    public final static int PARTIAL_RELIABLE_TIMED_UNORDERED = 0x82;
-    public final static int RELIABLE_UNORDERED = 0x80;
+    public final static byte RELIABLE = 0x0;
+    public final static byte PARTIAL_RELIABLE_REXMIT = 0x01;
+    public final static byte PARTIAL_RELIABLE_REXMIT_UNORDERED = (byte) 0x81;
+    public final static byte PARTIAL_RELIABLE_TIMED = 0x02;
+    public final static byte PARTIAL_RELIABLE_TIMED_UNORDERED = (byte) 0x82;
+    public final static byte RELIABLE_UNORDERED = (byte) 0x80;
 
     /*
      5.1.  DATA_CHANNEL_OPEN Message
@@ -116,7 +112,7 @@ public class DCOpen {
 
     public byte[] getBytes() {
         int sz = 12 + _labLen + pad(_labLen) + _protLen + pad(_protLen);
-        Log.verb("dcopen needs "+sz+" bytes ");
+        Log.verb("dcopen needs " + sz + " bytes ");
 
         byte[] ret = new byte[sz];
         ByteBuffer buff = ByteBuffer.wrap(ret);
@@ -127,9 +123,9 @@ public class DCOpen {
         buff.putChar((char) _labLen);
         buff.putChar((char) _protLen);
         buff.put(_label);
-        buff.position(buff.position()+pad(_labLen));
+        buff.position(buff.position() + pad(_labLen));
         buff.put(_protocol);
-        buff.position(buff.position()+pad(_protLen));
+        buff.position(buff.position() + pad(_protLen));
 
         return ret;
     }
@@ -137,12 +133,12 @@ public class DCOpen {
     final static public int pad(int len) {
         int mod = len % 4;
         int res = 0;
-        Log.verb("field of "+len+" mod 4 is "+mod);
+        Log.verb("field of " + len + " mod 4 is " + mod);
 
         if (mod > 0) {
-            res= (4 - mod);
+            res = (4 - mod);
         }
-        Log.verb("padded by "+res);
+        Log.verb("padded by " + res);
         return res;
     }
 
@@ -184,10 +180,27 @@ public class DCOpen {
     }
 
     public SCTPStreamBehaviour mkStreamBehaviour() {
-        // return a SCTPStreamBehaviour that applies the reliability, priority and ordering as specified in the open.
-        // for now just return a simple implementation
-        Log.debug("Making a behaviour for dcep stream "+_label);
-        return new DCEPStreamBehaviour() ;
+        Log.debug("Making a behaviour for dcep stream " + _label);
+        SCTPStreamBehaviour behave = null;
+        switch (_chanType) {
+            case RELIABLE:
+                behave = new OrderedStreamBehaviour();
+                break;
+            case RELIABLE_UNORDERED:
+                behave = new UnorderedStreamBehaviour();
+                break;
+            // todo these next 4 are wrong... the odering is atleast correct
+            // even if the retry is wrong.
+            case PARTIAL_RELIABLE_REXMIT:
+            case PARTIAL_RELIABLE_TIMED:
+                behave = new OrderedStreamBehaviour();
+                break;
+            case PARTIAL_RELIABLE_REXMIT_UNORDERED:
+            case PARTIAL_RELIABLE_TIMED_UNORDERED:
+                behave = new UnorderedStreamBehaviour();
+                break;
+        }
+        return behave;
     }
 
     public String getLabel() {

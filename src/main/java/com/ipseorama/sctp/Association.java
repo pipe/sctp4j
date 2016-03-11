@@ -139,7 +139,7 @@ abstract public class Association {
     private HashMap<Long, DataChunk> _outbound;
     protected State _state;
     private HashMap<Long, DataChunk> _holdingPen;
-
+    private static int TICK = 1000; // loop time in rcv
     ;
 
     class CookieHolder {
@@ -193,7 +193,8 @@ abstract public class Association {
                 try {
                     byte[] buf = new byte[_transp.getReceiveLimit()];
                     while (_rcv != null) {
-                        int length = _transp.receive(buf, 0, buf.length, _transp.getReceiveLimit());
+                        try {
+                        int length = _transp.receive(buf, 0, buf.length, TICK);
                         String b = Packet.getHex(buf, length);
                         Log.verb("DTLS message recieved\n" + b.toString());
                         ByteBuffer pbb = ByteBuffer.wrap(buf);
@@ -201,6 +202,10 @@ abstract public class Association {
                         Packet rec = new Packet(pbb);
                         Log.debug("SCTP message parsed\n" + rec.toString());
                         deal(rec);
+                        } catch (java.io.InterruptedIOException iox){
+                            ;// ignore. it should be a timeout.
+                            Log.verb("tick time out");
+                        }
                     }
                     Log.verb("SCTP message recv null\n Shutting down.");
 
@@ -209,7 +214,7 @@ abstract public class Association {
                 } catch (java.io.EOFException eof) {
                     unexpectedClose(eof);
                 } catch (Exception ex) {
-                    Log.debug("Association rcv failed");
+                    Log.debug("Association rcv failed "+ex.getClass().getName()+" "+ex.getMessage());
                     ex.printStackTrace();
                 }
             }

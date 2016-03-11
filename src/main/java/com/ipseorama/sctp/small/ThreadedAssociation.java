@@ -28,15 +28,12 @@ import com.ipseorama.sctp.messages.InitChunk;
 import com.ipseorama.sctp.messages.SackChunk;
 import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
 import com.phono.srtplight.Log;
-import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 
 /**
