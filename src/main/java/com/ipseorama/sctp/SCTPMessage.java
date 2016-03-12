@@ -18,12 +18,8 @@
 package com.ipseorama.sctp;
 
 import com.ipseorama.sctp.messages.DataChunk;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.NavigableMap;
-import java.util.Set;
+import com.phono.srtplight.Log;
 import java.util.SortedSet;
-import java.util.TreeSet;
 
 /**
  *
@@ -37,7 +33,7 @@ public class SCTPMessage {
     private int _pPid = 0;
     private int _hiSeq; // note do we need these ?
     private int _loSeq;
-    
+
     /**
      * Outbound message - note that we assume no one will mess with data between
      * calls to fill()
@@ -57,45 +53,46 @@ public class SCTPMessage {
         _pPid = DataChunk.WEBRTCSTRING;
     }
 
-    public SCTPMessage(SCTPStream s,SortedSet<DataChunk> chunks) {
+    public SCTPMessage(SCTPStream s, SortedSet<DataChunk> chunks) {
         _stream = s;
         int tot = 0;
-        if ((chunks.first().getFlags() & DataChunk.BEGINFLAG) == 0){
+        if ((chunks.first().getFlags() & DataChunk.BEGINFLAG) == 0) {
             throw new IllegalArgumentException("must start with 'start' chunk");
         }
-        if ((chunks.last().getFlags() & DataChunk.ENDFLAG) == 0){
+        if ((chunks.last().getFlags() & DataChunk.ENDFLAG) == 0) {
             throw new IllegalArgumentException("must end with 'end' chunk");
         }
-        int count = chunks.last().getSSeqNo() -chunks.first().getSSeqNo();
-        if (chunks.size() != count+1){
-            throw new IllegalArgumentException("chunk count is wrong "+chunks.size() +" vs "+count);
+        int count = chunks.last().getSSeqNo() - chunks.first().getSSeqNo();
+        if (chunks.size() != count + 1) {
+            throw new IllegalArgumentException("chunk count is wrong " + chunks.size() + " vs " + count);
         }
         _pPid = chunks.first().getPpid();
-        for (DataChunk dc:chunks){
+        for (DataChunk dc : chunks) {
             tot += dc.getDataSize();
-            if (_pPid != dc.getPpid()){
+            if (_pPid != dc.getPpid()) {
                 // aaagh 
-                throw new IllegalArgumentException("chunk has wrong ppid"+dc.getPpid() +" vs "+_pPid);
+                throw new IllegalArgumentException("chunk has wrong ppid" + dc.getPpid() + " vs " + _pPid);
             }
         }
         _data = new byte[tot];
         int offs = 0;
-        for (DataChunk dc:chunks){
+        for (DataChunk dc : chunks) {
             System.arraycopy(dc.getData(), 0, _data, offs, dc.getDataSize());
-            offs+= dc.getDataSize();
+            offs += dc.getDataSize();
         }
     }
 
-    public SCTPMessage(SCTPStream s,DataChunk singleChunk) {
+    public SCTPMessage(SCTPStream s, DataChunk singleChunk) {
         _stream = s;
         int flags = singleChunk.getFlags();
         if ((flags & singleChunk.SINGLEFLAG) > 0) {
             _data = singleChunk.getData();
+            _pPid = singleChunk.getPpid();
         } else {
             throw new IllegalArgumentException("must use a 'single' chunk");
         }
     }
-    
+
     public void setCompleteHandler(MessageCompleteHandler mch) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
@@ -103,7 +100,6 @@ public class SCTPMessage {
     public boolean hasMoreData() {
         return (_offset < _data.length);
     }
-
 
     /**
      * available datachunks are put here to be filled with data from this
@@ -152,6 +148,24 @@ public class SCTPMessage {
         if (first) {
             _loSeq = dc.getSSeqNo();
         }
+    }
+
+    public boolean deliver(SCTPStreamListener li) {
+        boolean delivered = false;
+        if (li != null) {
+            if ((li instanceof SCTPByteStreamListener) && (_pPid == DataChunk.WEBRTCBINARY)) {
+                ((SCTPByteStreamListener) li).onMessage(_stream, _data);
+                delivered = true;
+            }
+            if (_pPid == DataChunk.WEBRTCSTRING) {
+                li.onMessage(_stream, new String(_data));
+                delivered = true;
+            }
+        }
+        if (!delivered) {
+            Log.debug("Undelivered message " + this.toString());
+        }
+        return delivered;
     }
 
     public byte[] getData() {

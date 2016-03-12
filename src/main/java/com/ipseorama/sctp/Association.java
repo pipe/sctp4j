@@ -140,6 +140,7 @@ abstract public class Association {
     protected State _state;
     private HashMap<Long, DataChunk> _holdingPen;
     private static int TICK = 1000; // loop time in rcv
+
     ;
 
     class CookieHolder {
@@ -194,15 +195,15 @@ abstract public class Association {
                     byte[] buf = new byte[_transp.getReceiveLimit()];
                     while (_rcv != null) {
                         try {
-                        int length = _transp.receive(buf, 0, buf.length, TICK);
-                        String b = Packet.getHex(buf, length);
-                        Log.verb("DTLS message recieved\n" + b.toString());
-                        ByteBuffer pbb = ByteBuffer.wrap(buf);
-                        pbb.limit(length);
-                        Packet rec = new Packet(pbb);
-                        Log.debug("SCTP message parsed\n" + rec.toString());
-                        deal(rec);
-                        } catch (java.io.InterruptedIOException iox){
+                            int length = _transp.receive(buf, 0, buf.length, TICK);
+                            String b = Packet.getHex(buf, length);
+                            Log.verb("DTLS message recieved\n" + b.toString());
+                            ByteBuffer pbb = ByteBuffer.wrap(buf);
+                            pbb.limit(length);
+                            Packet rec = new Packet(pbb);
+                            Log.debug("SCTP message parsed\n" + rec.toString());
+                            deal(rec);
+                        } catch (java.io.InterruptedIOException iox) {
                             ;// ignore. it should be a timeout.
                             Log.verb("tick time out");
                         }
@@ -214,7 +215,7 @@ abstract public class Association {
                 } catch (java.io.EOFException eof) {
                     unexpectedClose(eof);
                 } catch (Exception ex) {
-                    Log.debug("Association rcv failed "+ex.getClass().getName()+" "+ex.getMessage());
+                    Log.debug("Association rcv failed " + ex.getClass().getName() + " " + ex.getMessage());
                     ex.printStackTrace();
                 }
             }
@@ -552,21 +553,30 @@ abstract public class Association {
 
         Integer sno = dc.getStreamId();
         long tsn = dc.getTsn();
+        boolean newStream = false;
         SCTPStream in = _streams.get(sno);
         if (in == null) {
             in = mkStream(sno);
             _streams.put(sno, in);
+            newStream = true;
         }
         Chunk[] repa;
         // todo dcep logic belongs in behave - not here.
         if (dc.getDCEP() != null) {
-            repa = dcepDeal(in, dc, dc.getDCEP());
-            if (_al != null) {
+            // delay 'till after first packet so we can get the label etc set 
+            // _however_ this should be in behave -as mentioned above.
+            if (newStream && _al != null) {
                 _al.onStream(in);
             }
+            repa = dcepDeal(in, dc, dc.getDCEP());
         } else {
+            // have to do this now or we would drop the first message
+            if (newStream && _al != null) {
+                _al.onStream(in);
+            }
             repa = in.append(dc);
         }
+
         if (repa != null) {
             for (Chunk r : repa) {
                 rep.add(r);
@@ -617,6 +627,7 @@ abstract public class Association {
         return rep.toArray(dummy);
     }
 // todo should be in a behave block
+
     private Chunk[] dcepDeal(SCTPStream s, DataChunk dc, DCOpen dcep) {
         Chunk[] rep = null;
         Log.debug("dealing with a decp for stream " + dc.getDataAsString());

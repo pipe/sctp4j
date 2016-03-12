@@ -28,15 +28,15 @@ import static org.junit.Assert.*;
  *
  * @author tim
  */
-public class OrderedReliableStreamBehaviourTest {
+public class OrderedStreamBehaviourTest {
 
-    public OrderedReliableStreamBehaviourTest() {
+    public OrderedStreamBehaviourTest() {
     }
     static Comparator<DataChunk> comp;
 
     @BeforeClass
     public static void setUpClass() {
-        Log.setLevel(Log.VERB);
+       // Log.setLevel(Log.VERB);
         comp = new Comparator<DataChunk>() {
             @Override
             public int compare(DataChunk o1, DataChunk o2) {

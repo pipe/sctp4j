@@ -40,8 +40,10 @@ public class UnorderedStreamBehaviour implements SCTPStreamBehaviour {
                 case DataChunk.SINGLEFLAG:
                     // singles are easy - just dispatch.
                     delivered.add(dc);
-                    SCTPMessage single = new SCTPMessage(dc.getData(), s);
-                    l.onMessage(s, new String(single.getData()));//todo deliver bytes when appropriate
+                    SCTPMessage single = new SCTPMessage( s, dc);
+                    if (single.deliver(l)) {
+                        delivered.add(dc);
+                    }
                     break;
                 case DataChunk.BEGINFLAG:
                     message = new TreeSet(stash.comparator());
@@ -60,8 +62,9 @@ public class UnorderedStreamBehaviour implements SCTPStreamBehaviour {
                     if ((message != null) && (expectedSeq == seq)) {
                         message.add(dc);
                         SCTPMessage deliverable = new SCTPMessage(s, message);
-                        l.onMessage(s, new String(deliverable.getData()));//todo deliver bytes when appropriate
-                        delivered.addAll(message);
+                        if (deliverable.deliver(l)) {
+                            delivered.addAll(message);
+                        }
                         message = null;
                     } else {
                         message = null;

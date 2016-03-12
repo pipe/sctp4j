@@ -18,7 +18,6 @@
 package com.ipseorama.base.dataChannel.DECP;
 
 import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
-import com.ipseorama.sctp.behave.DCEPStreamBehaviour;
 import com.ipseorama.sctp.behave.OrderedStreamBehaviour;
 import com.ipseorama.sctp.behave.UnorderedStreamBehaviour;
 import com.ipseorama.sctp.messages.Packet;

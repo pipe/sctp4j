@@ -26,9 +26,9 @@ import static org.junit.Assert.*;
  *
  * @author tim
  */
-public class UnreliableStreamBehaviourTest {
+public class UnorderedStreamBehaviourTest {
 
-    public UnreliableStreamBehaviourTest() {
+    public UnorderedStreamBehaviourTest() {
     }
     static Comparator<DataChunk> comp;
 

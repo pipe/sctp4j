@@ -5,20 +5,16 @@
  */
 package com.ipseorama.sctp.small;
 
-import com.ipseorama.base.dataChannel.QueuingDatagramTransport;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.AssociationListener;
+import com.ipseorama.sctp.SCTPByteStreamListener;
 import com.ipseorama.sctp.SCTPMessage;
 import com.ipseorama.sctp.SCTPStream;
 import com.ipseorama.sctp.SCTPStreamListener;
 import com.ipseorama.sctp.behave.OrderedStreamBehaviour;
-import com.ipseorama.sctp.messages.Chunk;
-import com.ipseorama.sctp.messages.DataChunk;
-import com.ipseorama.sctp.messages.InitAckChunk;
-import com.ipseorama.sctp.messages.InitChunk;
-import com.ipseorama.sctp.messages.SackChunk;
 import com.phono.srtplight.Log;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -41,7 +37,7 @@ public class ThreadedAssociationTest {
 
     @BeforeClass
     public static void setUpClass() {
-        Log.setLevel(Log.ALL);
+        Log.setLevel(Log.WARN);
     }
 
     @AfterClass
@@ -113,14 +109,18 @@ public class ThreadedAssociationTest {
 
         @Override
         public int receive(byte[] buf, int off, int len, int waitMillis) throws IOException {
-            int ret = 0;
+            int ret = -1;
             if (!_isShutdown || (_packetQueueIn.peek() != null)) {
                 try {
-                    Log.debug("recv ");
+                    Log.debug("Mock recv ");
                     byte pkt[] = _packetQueueIn.poll(waitMillis, TimeUnit.MILLISECONDS);
                     if (pkt != null) {
+                        Log.debug("Mock recv pkt length =" + pkt.length);
+                        Log.debug("Mock recv buff length =" + len);
                         ret = Math.min(len, pkt.length);
                         System.arraycopy(pkt, 0, buf, off, ret);
+                    } else {
+                        throw new java.io.InterruptedIOException("empty Queue");
                     }
                 } catch (InterruptedException ex) {
                     Log.debug("recv interrupted ");
@@ -130,6 +130,7 @@ public class ThreadedAssociationTest {
                 Log.debug("Transport  shutdown - throw exception.");
                 throw new java.io.EOFException("Transport was shutdown.");
             }
+            Log.debug("Mock receive returning " + ret);
             return ret;
         }
 
@@ -214,8 +215,8 @@ public class ThreadedAssociationTest {
         ThreadedAssociation instanceLeft = new ThreadedAssociation(trans[0], listenLeft);
         ThreadedAssociation instanceRight = new ThreadedAssociation(trans[1], listenRight);
         instanceLeft.associate();
-        synchronized (listenRight) {
-            listenRight.wait(1000);
+        synchronized (listenLeft) {
+            listenLeft.wait(1000);
             assert (listenLeft.associated);
             assert (listenRight.associated);
         }
@@ -234,6 +235,7 @@ public class ThreadedAssociationTest {
         final SCTPStreamListener rsl = new SCTPStreamListener() {
             @Override
             synchronized public void onMessage(SCTPStream s, String message) {
+                Log.debug("onmessage : " + message);
                 rightout.append(message);
                 this.notify();
             }
@@ -251,8 +253,8 @@ public class ThreadedAssociationTest {
         ThreadedAssociation instanceLeft = new ThreadedAssociation(trans[0], listenLeft);
         ThreadedAssociation instanceRight = new ThreadedAssociation(trans[1], listenRight);
         instanceLeft.associate();
-        synchronized (listenRight) {
-            listenRight.wait(1000);
+        synchronized (listenLeft) {
+            listenLeft.wait(1000);
             assert (listenLeft.associated);
             assert (listenRight.associated);
         }
@@ -262,8 +264,8 @@ public class ThreadedAssociationTest {
         String test = "Test message";
         SCTPMessage m = new SCTPMessage(test, result);
         instanceLeft.sendAndBlock(m);
-        synchronized (listenRight) {
-            listenRight.wait(1000);
+        synchronized (rightout) {
+            rightout.wait(1000);
             assert (rightout.toString().compareTo(test) == 0);
         }
     }
@@ -272,31 +274,28 @@ public class ThreadedAssociationTest {
      * Test of makeMessage method, of class ThreadedAssociation.
      */
     @Test
-    public void testMakeMessage_byteArr_BlockingSCTPStream() {
-        System.out.println("makeMessage");
-        byte[] bytes = null;
-        BlockingSCTPStream s = null;
-        ThreadedAssociation instance = null;
-        SCTPMessage expResult = null;
-        SCTPMessage result = instance.makeMessage(bytes, s);
-        assertEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
+    public void testMakeMessage_byteArr_BlockingSCTPStream() throws Exception {
+        System.out.println("---->makeMessage bytes");
 
-    /**
-     * Test of makeMessage method, of class ThreadedAssociation.
-     */
-    @Test
-    public void testMakeMessage_String_BlockingSCTPStream() throws Exception {
-        System.out.println("makeMessage");
-
-        final StringBuffer rightout = new StringBuffer();
-        final SCTPStreamListener rsl = new SCTPStreamListener() {
+        final ByteBuffer rightout = ByteBuffer.allocate(10000);
+        final StringBuffer empty = new StringBuffer();
+        final SCTPByteStreamListener rsl = new SCTPByteStreamListener() {
             @Override
-            synchronized public void onMessage(SCTPStream s, String message) {
-                rightout.append(message);
-                this.notify();
+             public void onMessage(SCTPStream s, String message) {
+                empty.append(message);
+                Log.debug("String onmessage : " + message);
+                synchronized (rightout) {
+                    rightout.notify();
+                }
+            }
+
+            @Override
+             public void onMessage(SCTPStream s, byte[] message) {
+                rightout.put(message);
+                Log.debug("Byte onmessage : " + message.length);
+                synchronized (rightout) {
+                    rightout.notify();
+                }
             }
         };
         DatagramTransport trans[] = mkMockTransports();
@@ -312,8 +311,59 @@ public class ThreadedAssociationTest {
         ThreadedAssociation instanceLeft = new ThreadedAssociation(trans[0], listenLeft);
         ThreadedAssociation instanceRight = new ThreadedAssociation(trans[1], listenRight);
         instanceLeft.associate();
-        synchronized (listenRight) {
-            listenRight.wait(1000);
+        synchronized (listenLeft) {
+            listenLeft.wait(2000);
+            assert (listenLeft.associated);
+            assert (listenRight.associated);
+        }
+        int id = 10;
+        SCTPStream s = instanceLeft.mkStream(id);
+        assert (s instanceof BlockingSCTPStream);
+        String test = "Test message";
+        SCTPMessage m = instanceLeft.makeMessage(test.getBytes(), (BlockingSCTPStream) s);
+        instanceLeft.sendAndBlock(m);
+        synchronized (rightout) {
+            rightout.wait(2000);
+            int l = rightout.position();
+            String res = new String(rightout.array(),0,l);
+            assert (res.compareTo(test) == 0);
+            assert (empty.length() == 0);
+        }
+    }
+
+    /**
+     * Test of makeMessage method, of class ThreadedAssociation.
+     */
+    @Test
+    public void testMakeMessage_String_BlockingSCTPStream() throws Exception {
+        System.out.println("---->makeMessage string");
+
+        final StringBuffer rightout = new StringBuffer();
+        final SCTPStreamListener rsl = new SCTPStreamListener() {
+            @Override
+            public void onMessage(SCTPStream s, String message) {
+                rightout.append(message);
+                Log.debug("onmessage : " + message);
+                synchronized (rightout) {
+                    rightout.notify();
+                }
+            }
+        };
+        DatagramTransport trans[] = mkMockTransports();
+        MockAssociationListener listenLeft = new MockAssociationListener();
+        MockAssociationListener listenRight = new MockAssociationListener() {
+            @Override
+            public void onStream(SCTPStream s) {
+                super.onStream(s);
+                s.setBehave(new OrderedStreamBehaviour());
+                s.setSCTPStreamListener(rsl);
+            }
+        };
+        ThreadedAssociation instanceLeft = new ThreadedAssociation(trans[0], listenLeft);
+        ThreadedAssociation instanceRight = new ThreadedAssociation(trans[1], listenRight);
+        instanceLeft.associate();
+        synchronized (listenLeft) {
+            listenLeft.wait(2000);
             assert (listenLeft.associated);
             assert (listenRight.associated);
         }
@@ -323,8 +373,8 @@ public class ThreadedAssociationTest {
         String test = "Test message";
         SCTPMessage m = instanceLeft.makeMessage(test, (BlockingSCTPStream) s);
         instanceLeft.sendAndBlock(m);
-        synchronized (listenRight) {
-            listenRight.wait(1000);
+        synchronized (rightout) {
+            rightout.wait(2000);
             assert (rightout.toString().compareTo(test) == 0);
         }
     }

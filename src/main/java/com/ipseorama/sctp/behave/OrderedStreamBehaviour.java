@@ -12,7 +12,6 @@ import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
 import java.util.ArrayList;
-import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
@@ -40,10 +39,11 @@ public class OrderedStreamBehaviour implements SCTPStreamBehaviour {
             switch (flags) {
                 case DataChunk.SINGLEFLAG:
                     // singles are easy - just dispatch.
-                    delivered.add(dc);
-                    SCTPMessage single = new SCTPMessage(dc.getData(), s);
-                    l.onMessage(s, new String(single.getData()));//todo deliver bytes when appropriate
-                    s.setNextSeq(seq + 1);
+                    SCTPMessage single = new SCTPMessage(s,dc);
+                    if (single.deliver(l)) {
+                        delivered.add(dc);
+                        s.setNextSeq(seq + 1);
+                    }
                     break;
                 case DataChunk.BEGINFLAG:
                     message = new TreeSet(stash.comparator());
@@ -60,9 +60,10 @@ public class OrderedStreamBehaviour implements SCTPStreamBehaviour {
                     if (message != null) {
                         message.add(dc);
                         SCTPMessage deliverable = new SCTPMessage(s, message);
-                        l.onMessage(s, new String(deliverable.getData()));//todo deliver bytes when appropriate
-                        s.setNextSeq(seq + 1);
-                        delivered.addAll(message);
+                        if (deliverable.deliver(l)) {
+                            delivered.addAll(message);
+                            s.setNextSeq(seq + 1);
+                        }
                         message = null;
                     } else {
                         message = null;
