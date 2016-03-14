@@ -49,7 +49,7 @@ public abstract class SCTPStream {
     public SCTPStream(Association a, Integer id) {
         _ass = a;
         _sno = id;
-        Comparator<DataChunk> comp = new Comparator<DataChunk>(){
+        Comparator<DataChunk> comp = new Comparator<DataChunk>() {
             @Override
             public int compare(DataChunk o1, DataChunk o2) {
                 return o1.getSSeqNo() - o2.getSSeqNo();
@@ -113,10 +113,12 @@ public abstract class SCTPStream {
 
     public void setSCTPStreamListener(SCTPStreamListener sl) {
         _sl = sl;
+        Log.debug("action a delayed delivery now we have a listener.");
+        //todo think about what reliablility looks like here.
+        _behave.deliver(this, _stash, _sl);
     }
 
-    
-    abstract public void send(String message) throws Exception; 
+    abstract public void send(String message) throws Exception;
 
     public Association getAssociation() {
         return _ass;

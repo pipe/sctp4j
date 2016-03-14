@@ -81,7 +81,12 @@ public class ThreadedAssociationTest {
         }
 
         @Override
-        public void onStream(SCTPStream s) {
+        public void onDCEPStream(SCTPStream s, String label, int type) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        @Override
+        public void onRawStream(SCTPStream s) {
             stream = s;
         }
     }
@@ -244,8 +249,8 @@ public class ThreadedAssociationTest {
         MockAssociationListener listenLeft = new MockAssociationListener();
         MockAssociationListener listenRight = new MockAssociationListener() {
             @Override
-            public void onStream(SCTPStream s) {
-                super.onStream(s);
+            public void onRawStream(SCTPStream s) {
+                super.onRawStream(s);
                 s.setBehave(new OrderedStreamBehaviour());
                 s.setSCTPStreamListener(rsl);
             }
@@ -302,8 +307,8 @@ public class ThreadedAssociationTest {
         MockAssociationListener listenLeft = new MockAssociationListener();
         MockAssociationListener listenRight = new MockAssociationListener() {
             @Override
-            public void onStream(SCTPStream s) {
-                super.onStream(s);
+            public void onRawStream(SCTPStream s) {
+                super.onRawStream(s);
                 s.setBehave(new OrderedStreamBehaviour());
                 s.setSCTPStreamListener(rsl);
             }
@@ -353,8 +358,8 @@ public class ThreadedAssociationTest {
         MockAssociationListener listenLeft = new MockAssociationListener();
         MockAssociationListener listenRight = new MockAssociationListener() {
             @Override
-            public void onStream(SCTPStream s) {
-                super.onStream(s);
+            public void onRawStream(SCTPStream s) {
+                super.onRawStream(s);
                 s.setBehave(new OrderedStreamBehaviour());
                 s.setSCTPStreamListener(rsl);
             }

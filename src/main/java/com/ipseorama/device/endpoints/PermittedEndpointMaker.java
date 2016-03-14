@@ -50,8 +50,7 @@ public abstract class PermittedEndpointMaker implements PermittedAssociationList
     abstract public void onDisAssociated(Association a);
 
     @Override
-    public void onStream(SCTPStream s) {
-        String lab = s.getLabel();
+    public void onDCEPStream(SCTPStream s, String lab, int type) {
         try {
             SCTPStreamListener sl = null;
             if (_certMaker.isAFriendPrint(_farFinger)) {
@@ -78,6 +77,11 @@ public abstract class PermittedEndpointMaker implements PermittedAssociationList
             }
         } catch (Exception ex) {
             Log.debug("problem making stream " + lab);
+            Log.debug("exception is  " + ex.getMessage());
+
+            if (Log.getLevel() >= Log.DEBUG) {
+                ex.printStackTrace(System.err);
+            }
         }
     }
 
@@ -114,4 +118,7 @@ public abstract class PermittedEndpointMaker implements PermittedAssociationList
         return ret;
     }
 
+    public void onRawStream(SCTPStream s) {
+        Log.debug("ignore raw stream notification");
+    }
 }

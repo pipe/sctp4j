@@ -199,6 +199,10 @@ public class DCOpen {
                 behave = new UnorderedStreamBehaviour();
                 break;
         }
+        if (behave != null){
+            Log.debug(_label + " behaviour is " +behave.getClass().getSimpleName());
+        }
+
         return behave;
     }
 

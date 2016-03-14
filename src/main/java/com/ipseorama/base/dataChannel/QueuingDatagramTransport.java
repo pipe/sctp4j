@@ -95,7 +95,7 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
         int ret = 0;
         if (!_isShutdown || (_packetQueue.peek() != null)) {
             try {
-                Log.debug("recv " + waitMillis);
+                Log.verb("recv " + waitMillis);
                 byte pkt[] = _packetQueue.poll(waitMillis, TimeUnit.MILLISECONDS);
                 if (pkt != null) {
                     ret = Math.min(len, pkt.length);

@@ -15,7 +15,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
-
 package com.ipseorama.sctp;
 
 /**
@@ -23,9 +22,13 @@ package com.ipseorama.sctp;
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
 public interface AssociationListener {
-    
+
     public void onAssociated(Association a);
+
     public void onDisAssociated(Association a);
-    public void onStream(SCTPStream s);
+
+    public void onDCEPStream(SCTPStream s, String label, int type);
+
+    public void onRawStream(SCTPStream s);
 
 }

@@ -9,7 +9,6 @@ import com.ipseorama.base.certHolders.CertHolder;
 import com.ipseorama.device.endpoints.PermittedAssociationListener;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.AssociationListener;
-import com.ipseorama.sctp.small.ThreadedAssociation;
 import com.phono.srtplight.Log;
 import java.io.IOException;
 import java.security.SecureRandom;
@@ -110,7 +109,7 @@ abstract class DTLSServer extends
         synchronized (nap) {
             while (_dtlsStatusOk == true) {
                 try {
-                    Log.error(" Napping ");
+                    Log.verb(" Napping ");
                     nap.wait(10000);
                 } catch (InterruptedException ex) {
                     Log.error("Error Napping " + ex.getMessage());

@@ -163,7 +163,7 @@ public class SCTPMessage {
             }
         }
         if (!delivered) {
-            Log.debug("Undelivered message " + this.toString());
+            Log.debug("Undelivered message to " + (_stream == null?"null stream":_stream.getLabel())+" via "+(li==null ? "null listener":li.getClass().getSimpleName())+ " ppid is "+_pPid);
         }
         return delivered;
     }

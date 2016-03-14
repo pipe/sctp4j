@@ -559,21 +559,16 @@ abstract public class Association {
             in = mkStream(sno);
             _streams.put(sno, in);
             newStream = true;
+            _al.onRawStream(in);
         }
         Chunk[] repa;
         // todo dcep logic belongs in behave - not here.
         if (dc.getDCEP() != null) {
+            repa = dcepDeal(in, dc, dc.getDCEP());
             // delay 'till after first packet so we can get the label etc set 
             // _however_ this should be in behave -as mentioned above.
-            if (newStream && _al != null) {
-                _al.onStream(in);
-            }
-            repa = dcepDeal(in, dc, dc.getDCEP());
+            _al.onDCEPStream(in, in.getLabel(), dc.getPpid());
         } else {
-            // have to do this now or we would drop the first message
-            if (newStream && _al != null) {
-                _al.onStream(in);
-            }
             repa = in.append(dc);
         }
 
@@ -637,6 +632,8 @@ abstract public class Association {
             SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
             s.setBehave(behave);
             s.setLabel(dcep.getLabel());
+            int seq = s.getNextSeq();
+            s.setNextSeq(seq + 1);
 
             rep = new Chunk[1];
             DataChunk ack = dc.mkAck(dcep);
@@ -649,6 +646,8 @@ abstract public class Association {
             Log.debug("got a dcep ack for " + s.getLabel());
             SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
             s.setBehave(behave);
+            int seq = s.getNextSeq();
+            s.setNextSeq(seq + 1);
         }
         return rep;
     }
