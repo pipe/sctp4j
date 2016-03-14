@@ -225,7 +225,7 @@ abstract public class Association {
     }
 
     public Association(DatagramTransport transport, AssociationListener al) {
-        Log.setLevel(Log.ALL);
+        //Log.setLevel(Log.ALL);
         Log.debug("Created an Associaction of type: " + this.getClass().getSimpleName());
 
         _al = al;
@@ -261,7 +261,7 @@ abstract public class Association {
             Log.verb("sending packet" + Packet.getHex(obb));
             _transp.send(obb.array(), obb.arrayOffset(), obb.position());
         } else {
-            Log.warn("Heh ? Blocked empty packet send()");
+            Log.verb("Blocked empty packet send() - probably no response needed.");
         }
     }
 

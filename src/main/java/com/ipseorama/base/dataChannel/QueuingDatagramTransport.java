@@ -7,6 +7,7 @@ package com.ipseorama.base.dataChannel;
 
 import com.phono.srtplight.Log;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -80,8 +81,11 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
                         Log.debug("overflowed stack");
                     }
                 }
+
+            } catch (InterruptedIOException ex) {
+                Log.verb("tick... ");
             } catch (IOException ex) {
-                Log.debug("problem in running recv thread " + ex.getMessage());
+                Log.verb("problem in running recv thread " + ex.getMessage());
             }
         }
         Log.debug("shutdown - rcv thread finishing");
@@ -91,7 +95,7 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
         int ret = 0;
         if (!_isShutdown || (_packetQueue.peek() != null)) {
             try {
-                Log.debug("recv "+waitMillis);
+                Log.debug("recv " + waitMillis);
                 byte pkt[] = _packetQueue.poll(waitMillis, TimeUnit.MILLISECONDS);
                 if (pkt != null) {
                     ret = Math.min(len, pkt.length);

@@ -20,6 +20,7 @@ package com.ipseorama.sctp.messages;
 import com.ipseorama.sctp.messages.params.RequestedHMACAlgorithmParameter;
 import com.ipseorama.sctp.messages.params.StateCookie;
 import com.ipseorama.sctp.messages.params.VariableParam;
+import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
@@ -120,7 +121,7 @@ public class InitAckChunk extends Chunk {
             _numOutStreams = _body.getChar();
             _numInStreams = _body.getChar();
             _initialTSN = getUnsignedInt(_body);
-            System.out.println("Init Ack" + this.toString());
+            Log.verb("Init Ack" + this.toString());
             while (_body.hasRemaining()) {
                 VariableParam v = readVariable();
                 _varList.add(v);
@@ -128,11 +129,11 @@ public class InitAckChunk extends Chunk {
 
             for (VariableParam v : _varList) {
                 // now look for variables we are expecting...
-                System.out.println("variable of type: " + v.getName() + " " + v.toString());
+                Log.verb("variable of type: " + v.getName() + " " + v.toString());
                 if (v instanceof StateCookie) {
                     _cookie = ((StateCookie) v).getData();
                 } else {
-                    System.out.println("ignored variable of type: " + v.getName());
+                    Log.verb("ignored variable of type: " + v.getName());
                 }
             }
 

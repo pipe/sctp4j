@@ -8,9 +8,7 @@ package com.ipseorama.sctp.behave;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.SCTPStream;
 import com.ipseorama.sctp.SCTPStreamListener;
-import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
-import com.phono.srtplight.Log;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -21,7 +19,6 @@ import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Test;
 import static org.junit.Assert.*;
 
 /**
@@ -84,7 +81,7 @@ public class OrderedStreamBehaviourTest {
 
         @Override
         public void onMessage(SCTPStream s, String message) {
-            System.out.println("delivered '"+message+"'");
+            //System.out.println("delivered '"+message+"'");
             assert (_results.remove(message));
         }
 
@@ -103,7 +100,7 @@ public class OrderedStreamBehaviourTest {
     
     @org.junit.Test
     public void testDeliverSingle() {
-        System.out.println("deliver single");
+        System.out.println("--> deliver single");
         SCTPStream s = mockStream();
         SortedSet<DataChunk> stash = new TreeSet(comp);
         DataChunk single = new DataChunk();
@@ -123,21 +120,21 @@ public class OrderedStreamBehaviourTest {
 
     @org.junit.Test
     public void testDontDeliverBegin() {
-        System.out.println("dont deliver Lone Begin");
+        System.out.println("--> dont deliver Lone Begin");
 
         dontDeliverOnePart(DataChunk.BEGINFLAG);
     }
 
     @org.junit.Test
     public void testDontDeliverMiddle() {
-        System.out.println("dont deliver Lone Middle");
+        System.out.println("--> dont deliver Lone Middle");
 
         dontDeliverOnePart(0);
     }
 
     @org.junit.Test
     public void testDontDeliverEnd() {
-        System.out.println("dont deliver Lone End");
+        System.out.println("--> dont deliver Lone End");
 
         dontDeliverOnePart(DataChunk.ENDFLAG);
     }
@@ -162,7 +159,7 @@ public class OrderedStreamBehaviourTest {
 
     @org.junit.Test
     public void testDeliverTwo() {
-        System.out.println("deliver two");
+        System.out.println("--> deliver two");
         SCTPStream s = mockStream();
         SortedSet<DataChunk> stash = new TreeSet(comp);
         String testStrings[] = {"Test String A", "Test String B"};
@@ -188,21 +185,21 @@ public class OrderedStreamBehaviourTest {
     @org.junit.Test
     public void testDeliverTwoPartMessage() {
         String testStrings[] = {"Test String A, ", "Test String B."};
-        System.out.println("deliver two part message");
+        System.out.println("--> deliver two part message");
         multiPartMessage(testStrings);
     }
 
     @org.junit.Test
     public void testDeliverThreePartMessage() {
         String testStrings[] = {"Test String A, ", "Test String B ", "and Test String C"};
-        System.out.println("deliver three part message");
+        System.out.println("--> deliver three part message");
         multiPartMessage(testStrings);
     }
 
     @org.junit.Test
     public void testDeliverLongMessage() {
         String testStrings[] = new String[333];
-        System.out.println("deliver many part message");
+        System.out.println("--> deliver many part message");
         for (int i = 0; i < testStrings.length; i++) {
             testStrings[i] = " Test string " + i;
         }
@@ -277,14 +274,14 @@ public class OrderedStreamBehaviourTest {
         instance.deliver(s, stash, l);
 
         int remain = result.size();
-        System.out.println("expected:" + expectedToRemain + " remain:" + remain);
+        //System.out.println("expected:" + expectedToRemain + " remain:" + remain);
 
         assertEquals(remain, expectedToRemain);
     }
 
     @org.junit.Test
     public void testDeliverNoMissingPartMessage() {
-        System.out.println("deliver no missing part message");
+        System.out.println("--> deliver no missing part message");
         String testStrings[] = {"Test String A, ", "Test String B ", "and Test String C"};
 
         oneMissingPartMessages(testStrings, "", -1);
@@ -292,7 +289,7 @@ public class OrderedStreamBehaviourTest {
 
     @org.junit.Test
     public void testDeliverOneMissingPartMessage() {
-        System.out.println("deliver one missing part message");
+        System.out.println("--> deliver one missing part message");
         String testStrings[] = {"Test String A, ", "Test String B ", "and Test String C"};
 
         for (String es : testStrings) {
@@ -304,7 +301,7 @@ public class OrderedStreamBehaviourTest {
 
     @org.junit.Test
     public void testDeliverUnorderedPackets() {
-        System.out.println("deliver messages with random packet arrival");
+        System.out.println("--> deliver messages with random packet arrival");
         for (int i = 0; i < 100; i++) {
             deliverUnorderedPackets(i);
         }

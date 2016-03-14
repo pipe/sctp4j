@@ -249,25 +249,25 @@ public abstract class Chunk {
         int pad = 0;
         if (_varList != null) {
             for (VariableParam v : this._varList) {
-                System.out.println("var " + v.getName() + " at " + ret.position());
+                Log.verb("var " + v.getName() + " at " + ret.position());
 
                 ByteBuffer var = ret.slice();
                 var.putChar((char) v.getType());
                 var.putChar((char) 4); // length holder.
                 v.writeBody(var);
                 var.putChar(2, (char) var.position());
-                System.out.println("setting var length to " + var.position());
+                Log.verb("setting var length to " + var.position());
                 pad = var.position() % 4;
                 pad = (pad != 0) ? 4 - pad : 0;
-                System.out.println("padding by " + pad);
+                Log.verb("padding by " + pad);
                 ret.position(ret.position() + var.position() + pad);
             }
         }
-        System.out.println("un padding by " + pad);
+        //System.out.println("un padding by " + pad);
         ret.position(ret.position() - pad);
         // and push the new length into place.
         ret.putChar(2, (char) ret.position());
-        System.out.println("setting chunk length to " + ret.position());
+        //System.out.println("setting chunk length to " + ret.position());
     }
 
     public String typeLookup() {
@@ -429,7 +429,7 @@ public abstract class Chunk {
         }
         try {
             var.readBody(_body, blen);
-            System.out.println("variable type " + var.getType() + " name " + var.getName());
+            Log.verb("variable type " + var.getType() + " name " + var.getName());
         } catch (SctpPacketFormatException ex) {
             Log.error(ex.getMessage());
         }

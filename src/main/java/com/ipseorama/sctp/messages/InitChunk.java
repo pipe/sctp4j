@@ -7,6 +7,7 @@ package com.ipseorama.sctp.messages;
 
 import com.ipseorama.sctp.messages.params.RequestedHMACAlgorithmParameter;
 import com.ipseorama.sctp.messages.params.VariableParam;
+import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
@@ -59,14 +60,14 @@ public class InitChunk extends Chunk {
             _numOutStreams = _body.getChar();
             _numInStreams = _body.getChar();
             _initialTSN =  getUnsignedInt(_body);
-            System.out.println("Init " + this.toString());
+            Log.verb("Init " + this.toString());
             while (_body.hasRemaining()) {
                 VariableParam v = readVariable();
                 _varList.add(v);
             }
             for (VariableParam v : _varList){
                 // now look for variables we are expecting...
-                System.out.println("variable of type: "+v.getName()+" "+ v.toString());
+                Log.verb("variable of type: "+v.getName()+" "+ v.toString());
                 if (v instanceof SupportedExtensions){
                     _farSupportedExtensions = ((SupportedExtensions)v).getData();
                 } else if (v instanceof RandomParam){
@@ -78,7 +79,7 @@ public class InitChunk extends Chunk {
                 } else if (v instanceof ChunkListParam){
                     _farChunks = ((ChunkListParam)v).getData();
                 } else {
-                    System.out.println("unexpected variable of type: "+v.getName());
+                    Log.verb("unexpected variable of type: "+v.getName());
                 }
             }
         }

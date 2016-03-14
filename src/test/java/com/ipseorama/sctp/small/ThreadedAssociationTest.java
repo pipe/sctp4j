@@ -187,7 +187,7 @@ public class ThreadedAssociationTest {
      */
     @Test
     public void testAssociate() throws Exception {
-        System.out.println("associate");
+        System.out.println("--> associate");
 
         DatagramTransport trans[] = mkMockTransports();
         MockAssociationListener listenLeft = new MockAssociationListener();
@@ -207,7 +207,7 @@ public class ThreadedAssociationTest {
      */
     @Test
     public void testMkStream() throws Exception {
-        System.out.println("mkStream");
+        System.out.println("--> mkStream");
 
         DatagramTransport trans[] = mkMockTransports();
         MockAssociationListener listenLeft = new MockAssociationListener();
@@ -230,7 +230,7 @@ public class ThreadedAssociationTest {
      */
     @Test
     public void testSendAndBlock() throws Exception {
-        System.out.println("sendAndBlock");
+        System.out.println("--> sendAndBlock");
         final StringBuffer rightout = new StringBuffer();
         final SCTPStreamListener rsl = new SCTPStreamListener() {
             @Override

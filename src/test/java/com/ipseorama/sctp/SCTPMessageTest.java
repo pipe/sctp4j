@@ -13,6 +13,7 @@ import com.ipseorama.sctp.small.BlockingSCTPStream;
 import java.io.IOException;
 import java.util.Comparator;
 import java.util.TreeSet;
+import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -49,7 +50,37 @@ public class SCTPMessageTest {
                 return o1.getSSeqNo() - o2.getSSeqNo();
             }
         };
-        _fakeAssociation = new Association(null, null) {
+        DatagramTransport _fakedt = new DatagramTransport() {
+
+            @Override
+            public int getReceiveLimit() throws IOException {
+                return 1200;
+            }
+
+            @Override
+            public int getSendLimit() throws IOException {
+                return 1200;
+            }
+
+            @Override
+            public int receive(byte[] bytes, int i, int i1, int waitMs) throws IOException {
+                try {
+                    Thread.sleep(waitMs);
+                } catch (Exception x) {
+                }
+                throw new java.io.InterruptedIOException("empty");
+            }
+
+            @Override
+            public void send(byte[] bytes, int i, int i1) throws IOException {
+            }
+
+            @Override
+            public void close() throws IOException {
+            }
+
+        };
+        _fakeAssociation = new Association(_fakedt, null) {
             @Override
             public void associate() throws SctpPacketFormatException, IOException {
                 throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
@@ -102,31 +133,31 @@ public class SCTPMessageTest {
      * Test of setCompleteHandler method, of class SCTPMessage.
      */
     /*
-    @Test
-    public void testSetCompleteHandler() {
-        System.out.println("setCompleteHandler");
-        MessageCompleteHandler mch = null;
-        SCTPMessage instance = null;
-        instance.setCompleteHandler(mch);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }
+     @Test
+     public void testSetCompleteHandler() {
+     System.out.println("setCompleteHandler");
+     MessageCompleteHandler mch = null;
+     SCTPMessage instance = null;
+     instance.setCompleteHandler(mch);
+     // TODO review the generated test code and remove the default call to fail.
+     fail("The test case is a prototype.");
+     }
      */
     /**
      * Test of hasMoreData method, of class SCTPMessage.
      */
     /*
-    @Test
-    public void testHasMoreData() {
+     @Test
+     public void testHasMoreData() {
 
-    }
+     }
      */
     /**
      * Test of fill method, of class SCTPMessage.
      */
     @Test
     public void testFillShortString() {
-        System.out.println("fill short");
+        System.out.println("--> fill short");
         String testString = "This is a short test";
         SCTPMessage instance = new SCTPMessage(testString, _fakeStream);
         TreeSet<DataChunk> chunks = new TreeSet<DataChunk>(_comp);
@@ -140,9 +171,9 @@ public class SCTPMessageTest {
 
     @Test
     public void testFillLongString() {
-        System.out.println("fill long");
+        System.out.println("--> fill long");
         StringBuffer sb = new StringBuffer("This is a");
-        for (int i=0;i<1030;i++){
+        for (int i = 0; i < 1030; i++) {
             sb.append(" long");
         }
         sb.append(" test.");
@@ -155,7 +186,7 @@ public class SCTPMessageTest {
             chunks.add(dc);
         }
         double pktsz = chunks.first().getDataSize();
-        int estimate = (int)Math.ceil(testString.length() / pktsz  ); 
+        int estimate = (int) Math.ceil(testString.length() / pktsz);
         assertEquals(chunks.size(), estimate);
     }
 
@@ -163,14 +194,14 @@ public class SCTPMessageTest {
      * Test of getData method, of class SCTPMessage.
      */
     /*
-    @Test
-    public void testGetData() {
-        System.out.println("getData");
-        SCTPMessage instance = null;
-        byte[] expResult = null;
-        byte[] result = instance.getData();
-        assertArrayEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }*/
+     @Test
+     public void testGetData() {
+     System.out.println("getData");
+     SCTPMessage instance = null;
+     byte[] expResult = null;
+     byte[] result = instance.getData();
+     assertArrayEquals(expResult, result);
+     // TODO review the generated test code and remove the default call to fail.
+     fail("The test case is a prototype.");
+     }*/
 }
