@@ -57,7 +57,7 @@ public class IceConnect implements PropertyChangeListener {
     private String _ffp;
     public Runnable cleanup;
     private DTLSEndpoint _dtls;
-    protected boolean _dtlsClientRole = true; // by default we would rather be the DTLS client
+    protected boolean _dtlsClientRole = false; // we would rather be the DTLS client but for now lets say server
     private boolean _wantToStartIce;
     protected boolean _haveLocalCandy;
     protected boolean _haveRemoteCandy;

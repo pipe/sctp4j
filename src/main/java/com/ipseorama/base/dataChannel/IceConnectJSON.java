@@ -132,8 +132,9 @@ public class IceConnectJSON extends IceConnect {
                     _dtlsClientRole = true; // they are passive, so we have to take the lead
                     break;
                 case "actpass":
-                    _dtlsClientRole = true; // we have a mild preference for going first and
-                        // they don't care
+                    _dtlsClientRole = false; // we have a mild preference for going first and
+                        // but this doesn't seem to work - dtls client does not retry correctly
+                        // so for now we will be a passive server
                     break;
                 default:
                     Log.error("Huh? setup type unrecognized "+ setup);

@@ -54,7 +54,7 @@ abstract class DTLSClient extends
     };
 
     public DTLSClient(CertHolder cert, DatagramTransport dt, AssociationListener al, String farFingerprint) throws Exception {
-
+        super();
         _al = al;
         _cert = cert;
         _ffp = farFingerprint;
@@ -65,7 +65,7 @@ abstract class DTLSClient extends
         }
         _dt = dt;
         _client = new Thread(this);
-        _client.setName("DTLSlient");
+        _client.setName("DTLSlient-"+_ffp);
         _client.start();
     }
 
