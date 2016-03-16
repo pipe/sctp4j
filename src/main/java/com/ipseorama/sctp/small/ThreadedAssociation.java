@@ -43,7 +43,7 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
  */
 public class ThreadedAssociation extends Association implements Runnable {
 
-    final static int MAXBLOCKS = 16; // some number....
+    final static int MAXBLOCKS = 128; // some number....
     private ArrayBlockingQueue<DataChunk> _freeBlocks;
     private HashMap<Long, DataChunk> _inFlight;
     private long _lastCumuTSNAck;
@@ -125,6 +125,12 @@ public class ThreadedAssociation extends Association implements Runnable {
 
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
         super(transport, al);
+        /*try {
+            _transpMTU = Math.min(transport.getReceiveLimit(), transport.getSendLimit());
+            Log.debug("Transport MTU is now " + _transpMTU);
+        } catch (IOException x) {
+            Log.warn("Failed to get suitable transport mtu ");
+        }*/
         _freeBlocks = new ArrayBlockingQueue(MAXBLOCKS);
         _inFlight = new HashMap(MAXBLOCKS);
 

@@ -117,7 +117,7 @@ public class OrderedStreamBehaviourTest {
         int remain = result.size();
         assertEquals(remain, 0);
     }
-
+    
     @org.junit.Test
     public void testDontDeliverBegin() {
         System.out.println("--> dont deliver Lone Begin");
@@ -199,13 +199,23 @@ public class OrderedStreamBehaviourTest {
     @org.junit.Test
     public void testDeliverLongMessage() {
         String testStrings[] = new String[333];
-        System.out.println("--> deliver many part message");
+        System.out.println("--> deliver many part long message");
         for (int i = 0; i < testStrings.length; i++) {
             testStrings[i] = " Test string " + i;
         }
         multiPartMessage(testStrings);
     }
 
+    @org.junit.Test
+    public void testDeliverVeryLongMessage() {
+        String testStrings[] = new String[10000];
+        System.out.println("--> deliver many part very long message");
+        for (int i = 0; i < testStrings.length; i++) {
+            testStrings[i] = "" + i;
+        }
+        multiPartMessage(testStrings);
+    }
+    
     void multiPartMessage(String[] testStrings) {
         SCTPStream s = mockStream();
         SortedSet<DataChunk> stash = new TreeSet(comp);

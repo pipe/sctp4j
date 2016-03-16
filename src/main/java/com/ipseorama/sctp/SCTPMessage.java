@@ -136,6 +136,7 @@ public class SCTPMessage {
             last = true;
         } else {
             // middle chunk.
+            dc.setFlags(0);
             dc.setData(_data, _offset, dsz);
             _offset += dsz;
         }

@@ -197,7 +197,9 @@ public class Packet {
         setChecksum(pkt);
         long calc = (long) pkt.getInt(SUMOFFSET);
         if (calc != farsum) {
-            Log.debug("Checksums don't match " + Long.toHexString(calc) + " vs " + Long.toHexString(farsum));
+            Log.error("Checksums don't match " + Long.toHexString(calc) + " vs " + Long.toHexString(farsum));
+            byte []p = pkt.array();
+            Log.error("for packet "+getHex(p));
             throw new ChecksumException();
         }
     }

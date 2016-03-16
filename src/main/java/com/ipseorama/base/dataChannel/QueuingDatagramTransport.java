@@ -41,12 +41,12 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
 
     @Override
     public int getReceiveLimit() throws IOException {
-        return 1200;
+        return 4094; //Math.min(1200,_ds.getReceiveBufferSize());
     }
 
     @Override
     public int getSendLimit() throws IOException {
-        return 1200;
+        return 4096;// Math.min(1200,_ds.getSendBufferSize());
     }
 
     @Override

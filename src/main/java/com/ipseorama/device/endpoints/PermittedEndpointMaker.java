@@ -118,6 +118,7 @@ public abstract class PermittedEndpointMaker implements PermittedAssociationList
         return ret;
     }
 
+    @Override
     public void onRawStream(SCTPStream s) {
         Log.debug("ignore raw stream notification");
     }
