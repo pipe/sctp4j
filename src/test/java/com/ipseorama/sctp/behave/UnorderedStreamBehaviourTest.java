@@ -26,18 +26,14 @@ import static org.junit.Assert.*;
  */
 public class UnorderedStreamBehaviourTest {
 
+    private long _tsn = 111;
+
     public UnorderedStreamBehaviourTest() {
     }
-    static Comparator<DataChunk> comp;
 
     @BeforeClass
     public static void setUpClass() {
-        comp = new Comparator<DataChunk>() {
-            @Override
-            public int compare(DataChunk o1, DataChunk o2) {
-                return o1.getSSeqNo() - o2.getSSeqNo();
-            }
-        };
+
     }
 
     @AfterClass
@@ -56,16 +52,16 @@ public class UnorderedStreamBehaviourTest {
      * Test of respond method, of class UnreliableStreamBehaviour.
      */
     /*@org.junit.Test
-    public void testRespond() {
-        System.out.println("respond");
-        SCTPStream a = null;
-        UnreliableStreamBehaviour instance = new UnreliableStreamBehaviour();
-        Chunk[] expResult = null;
-        Chunk[] result = instance.respond(a);
-        assertArrayEquals(expResult, result);
-        // TODO review the generated test code and remove the default call to fail.
-        fail("The test case is a prototype.");
-    }*/
+     public void testRespond() {
+     System.out.println("respond");
+     SCTPStream a = null;
+     UnreliableStreamBehaviour instance = new UnreliableStreamBehaviour();
+     Chunk[] expResult = null;
+     Chunk[] result = instance.respond(a);
+     assertArrayEquals(expResult, result);
+     // TODO review the generated test code and remove the default call to fail.
+     fail("The test case is a prototype.");
+     }*/
     /**
      * Test of deliver method, of class UnreliableStreamBehaviour.
      */
@@ -88,12 +84,14 @@ public class UnorderedStreamBehaviourTest {
     public void testDeliverSingle() {
         System.out.println("--> deliver single");
         SCTPStream s = null;
-        SortedSet<DataChunk> stash = new TreeSet(comp);
+        SortedSet<DataChunk> stash = new TreeSet();
         DataChunk single = new DataChunk();
         final String testString = "Test String";
         single.setData(testString.getBytes());
         single.setPpid(DataChunk.WEBRTCSTRING);
         single.setFlags(DataChunk.SINGLEFLAG);
+        single.setTsn(_tsn++);
+        single.setsSeqNo(0);
         stash.add(single);
         ArrayList<String> result = new ArrayList<String>();
         result.add(testString);
@@ -127,12 +125,14 @@ public class UnorderedStreamBehaviourTest {
 
     void dontDeliverOnePart(int flag) {
         SCTPStream s = null;
-        SortedSet<DataChunk> stash = new TreeSet(comp);
+        SortedSet<DataChunk> stash = new TreeSet();
         DataChunk single = new DataChunk();
         final String testString = "Test String";
         single.setData(testString.getBytes());
         single.setPpid(DataChunk.WEBRTCSTRING);
         single.setFlags(flag);
+        single.setTsn(_tsn++);
+        single.setsSeqNo(0);
         stash.add(single);
         ArrayList<String> result = new ArrayList<String>();
         result.add(testString);
@@ -147,13 +147,14 @@ public class UnorderedStreamBehaviourTest {
     public void testDeliverTwo() {
         System.out.println("--> deliver two");
         SCTPStream s = null;
-        SortedSet<DataChunk> stash = new TreeSet(comp);
+        SortedSet<DataChunk> stash = new TreeSet();
         String testStrings[] = {"Test String A", "Test String B"};
         ArrayList<String> result = new ArrayList<String>();
         int n = 0;
         for (String ts : testStrings) {
             DataChunk single = new DataChunk();
-            single.setsSeqNo(n++);
+            single.setTsn(_tsn++);
+            single.setsSeqNo(0);
             single.setData(ts.getBytes());
             single.setPpid(DataChunk.WEBRTCSTRING);
             single.setFlags(DataChunk.SINGLEFLAG);
@@ -194,13 +195,14 @@ public class UnorderedStreamBehaviourTest {
 
     void multiPartMessage(String[] testStrings) {
         SCTPStream s = null;
-        SortedSet<DataChunk> stash = new TreeSet(comp);
+        SortedSet<DataChunk> stash = new TreeSet();
         ArrayList<String> result = new ArrayList<String>();
         int n = 0;
         StringBuffer bs = new StringBuffer();
         for (String ts : testStrings) {
             DataChunk single = new DataChunk();
-            single.setsSeqNo(n);
+            single.setTsn(_tsn++);
+            single.setsSeqNo(0);
             single.setData(ts.getBytes());
             single.setPpid(DataChunk.WEBRTCSTRING);
             if (n == 0) {
@@ -223,7 +225,7 @@ public class UnorderedStreamBehaviourTest {
 
     void oneMissingPartMessages(String[] testStrings, String es, int ec) {
         SCTPStream s = null;
-        SortedSet<DataChunk> stash = new TreeSet(comp);
+        SortedSet<DataChunk> stash = new TreeSet();
         ArrayList<String> result = new ArrayList<String>();
         int n = 0;
         int expectedToRemain = 0;
@@ -231,6 +233,7 @@ public class UnorderedStreamBehaviourTest {
             for (int i = 0; i < ts.length(); i++) {
                 DataChunk single = new DataChunk();
                 single.setsSeqNo(n);
+                single.setTsn(_tsn++);
                 String letter = ts.substring(i, i + 1);
                 single.setData(letter.getBytes());
                 single.setPpid(DataChunk.WEBRTCSTRING);
@@ -239,7 +242,6 @@ public class UnorderedStreamBehaviourTest {
                 } else if (i == ts.length() - 1) {
                     single.setFlags(DataChunk.ENDFLAG);
                 }
-                n++;
                 if ((ec != i) || !ts.equals(es)) {
                     stash.add(single);
                 }
@@ -248,6 +250,8 @@ public class UnorderedStreamBehaviourTest {
                 expectedToRemain += 1;
             }
             result.add(ts);
+            n++;
+
         }
 
         SCTPStreamListener l = new CheckingStreamListener(result);
@@ -291,7 +295,7 @@ public class UnorderedStreamBehaviourTest {
 
     public void deliverUnorderedPackets(int seed) {
         Random rand = new Random(seed); // deliberately not crypto random so test is repeatable 
-       // System.out.println("seed = "+seed);
+        // System.out.println("seed = "+seed);
         String testStrings[] = {"Test String A, ", "Test String B ", "and Test String C"};
         SCTPStream s = null;
         ArrayList<String> result = new ArrayList<String>();
@@ -301,6 +305,7 @@ public class UnorderedStreamBehaviourTest {
             for (int i = 0; i < ts.length(); i++) {
                 DataChunk single = new DataChunk();
                 single.setsSeqNo(n);
+                single.setTsn(_tsn++);
                 String letter = ts.substring(i, i + 1);
                 single.setData(letter.getBytes());
                 single.setPpid(DataChunk.WEBRTCSTRING);
@@ -310,14 +315,15 @@ public class UnorderedStreamBehaviourTest {
                     single.setFlags(DataChunk.ENDFLAG);
                 }
                 all.add(single);
-                n++;
             }
             result.add(ts);
+            n++;
+
         }
 
         SCTPStreamListener l = new CheckingStreamListener(result);
         UnorderedStreamBehaviour instance = new UnorderedStreamBehaviour();
-        SortedSet<DataChunk> stash = new TreeSet(comp);
+        SortedSet<DataChunk> stash = new TreeSet();
         while (all.size() > 0) {
             int v = rand.nextInt(all.size());
             DataChunk c = all.remove(v);

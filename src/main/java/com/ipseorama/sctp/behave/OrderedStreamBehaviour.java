@@ -21,6 +21,8 @@ import java.util.TreeSet;
  */
 public class OrderedStreamBehaviour implements SCTPStreamBehaviour {
 
+    protected boolean _ordered = true;
+    
     @Override
     public void deliver(SCTPStream s, SortedSet<DataChunk> stash, SCTPStreamListener l) {
         //stash is the list of all DataChunks that have not yet been turned into whole messages
@@ -47,7 +49,7 @@ public class OrderedStreamBehaviour implements SCTPStreamBehaviour {
             switch (flags) {
                 case DataChunk.SINGLEFLAG:
                     // singles are easy - just dispatch.
-                    if (messageNo != dc.getSSeqNo()) {
+                    if (_ordered && (messageNo != dc.getSSeqNo())) {
                         Log.debug("Hole (single) in message sequence  " + dc.getSSeqNo() + " expected " + messageNo);
                         break; // not the message we are looking for...
                     }
@@ -59,7 +61,7 @@ public class OrderedStreamBehaviour implements SCTPStreamBehaviour {
                     }
                     break;
                 case DataChunk.BEGINFLAG:
-                    if (messageNo != dc.getSSeqNo()) {
+                    if (_ordered && (messageNo != dc.getSSeqNo())) {
                         Log.debug("Hole (begin) in message sequence  " + dc.getSSeqNo() + " expected " + messageNo);
                         break; // not the message we are looking for...
                     }
