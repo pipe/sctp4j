@@ -27,7 +27,7 @@ import java.util.Comparator;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-public class DataChunk extends Chunk implements Comparator {
+public class DataChunk extends Chunk implements Comparable,Comparator {
     /*
      +------------------------------------+-----------+-----------+
      | Value                              | SCTP PPID | Reference |
@@ -310,6 +310,11 @@ public class DataChunk extends Chunk implements Comparator {
     }
     public long getRetryTime(){
         return _retryTime;
+    }
+
+    @Override
+    public int compareTo(Object o) {
+        return compare(this,o);
     }
 
     @Override

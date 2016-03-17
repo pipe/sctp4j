@@ -11,7 +11,6 @@ import com.ipseorama.sctp.messages.SackChunk;
 import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
 import com.ipseorama.sctp.small.BlockingSCTPStream;
 import java.io.IOException;
-import java.util.Comparator;
 import java.util.TreeSet;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.junit.After;
@@ -28,7 +27,6 @@ import static org.junit.Assert.*;
 public class SCTPMessageTest {
 
     private SCTPStream _fakeStream;
-    private Comparator<DataChunk> _comp;
 
     public SCTPMessageTest() {
     }
@@ -44,12 +42,6 @@ public class SCTPMessageTest {
 
     @Before
     public void setUp() {
-        _comp = new Comparator<DataChunk>() {
-            @Override
-            public int compare(DataChunk o1, DataChunk o2) {
-                return o1.getSSeqNo() - o2.getSSeqNo();
-            }
-        };
         DatagramTransport _fakedt = new DatagramTransport() {
 
             @Override
@@ -160,7 +152,7 @@ public class SCTPMessageTest {
         System.out.println("--> fill short");
         String testString = "This is a short test";
         SCTPMessage instance = new SCTPMessage(testString, _fakeStream);
-        TreeSet<DataChunk> chunks = new TreeSet<DataChunk>(_comp);
+        TreeSet<DataChunk> chunks = new TreeSet<DataChunk>();
         while (instance.hasMoreData()) {
             DataChunk dc = new DataChunk();
             instance.fill(dc);
@@ -179,9 +171,12 @@ public class SCTPMessageTest {
         sb.append(" test.");
         String testString = sb.toString();
         SCTPMessage instance = new SCTPMessage(testString, _fakeStream);
-        TreeSet<DataChunk> chunks = new TreeSet<DataChunk>(_comp);
+        TreeSet<DataChunk> chunks = new TreeSet<DataChunk>();
+        long tsn = 111;
+
         while (instance.hasMoreData()) {
             DataChunk dc = new DataChunk();
+            dc.setTsn(tsn++);
             instance.fill(dc);
             chunks.add(dc);
         }

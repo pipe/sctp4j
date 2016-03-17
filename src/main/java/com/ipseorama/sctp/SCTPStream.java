@@ -22,7 +22,6 @@ import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
-import java.util.Comparator;
 import java.util.TreeSet;
 
 /**
@@ -42,20 +41,14 @@ public abstract class SCTPStream {
     private Integer _sno;
     private String _label;
     private TreeSet<DataChunk> _stash;
-    private char _outSeqno;
     private SCTPStreamListener _sl;
-    private int _nextSeq;
+    private int _nextMessageSeqIn;
+    private int _nextMessageSeqOut;
 
     public SCTPStream(Association a, Integer id) {
         _ass = a;
         _sno = id;
-        Comparator<DataChunk> comp = new Comparator<DataChunk>() {
-            @Override
-            public int compare(DataChunk o1, DataChunk o2) {
-                return o1.getSSeqNo() - o2.getSSeqNo();
-            }
-        };
-        _stash = new TreeSet<DataChunk>(comp);
+        _stash = new TreeSet<>(); // sort bt tsn
         _behave = new OrderedStreamBehaviour(); // default 'till we know different
     }
 
@@ -87,7 +80,6 @@ public abstract class SCTPStream {
      */
     public void outbound(DataChunk chunk) {
         chunk.setStreamId(_sno.intValue());
-        chunk.setsSeqNo(_outSeqno++);
         // roll seqno here.... hopefully....
     }
 
@@ -128,11 +120,19 @@ public abstract class SCTPStream {
         Log.debug("close() Not supported yet.");
     }
 
-    public void setNextSeq(int expectedSeq) {
-        _nextSeq = expectedSeq;
+    public void setNextMessageSeqIn(int expectedSeq) {
+        _nextMessageSeqIn = expectedSeq;
     }
 
-    public int getNextSeq() {
-        return _nextSeq;
+    public int getNextMessageSeqIn() {
+        return _nextMessageSeqIn;
+    }
+
+    public void setNextMessageSeqOut(int expectedSeq) {
+        _nextMessageSeqOut = expectedSeq;
+    }
+
+    public int getNextMessageSeqOut() {
+        return _nextMessageSeqOut;
     }
 }

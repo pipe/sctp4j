@@ -126,11 +126,11 @@ public class ThreadedAssociation extends Association implements Runnable {
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
         super(transport, al);
         /*try {
-            _transpMTU = Math.min(transport.getReceiveLimit(), transport.getSendLimit());
-            Log.debug("Transport MTU is now " + _transpMTU);
-        } catch (IOException x) {
-            Log.warn("Failed to get suitable transport mtu ");
-        }*/
+         _transpMTU = Math.min(transport.getReceiveLimit(), transport.getSendLimit());
+         Log.debug("Transport MTU is now " + _transpMTU);
+         } catch (IOException x) {
+         Log.warn("Failed to get suitable transport mtu ");
+         }*/
         _freeBlocks = new ArrayBlockingQueue(MAXBLOCKS);
         _inFlight = new HashMap(MAXBLOCKS);
 
@@ -251,11 +251,16 @@ public class ThreadedAssociation extends Association implements Runnable {
     }
 
     @Override
-    public SCTPMessage makeMessage(byte[] bytes, BlockingSCTPStream s) {
+    synchronized public SCTPMessage makeMessage(byte[] bytes, BlockingSCTPStream s) {
         SCTPMessage m = null;
         if (super.canSend()) {
             if (bytes.length < this.maxMessageSize()) {
                 m = new SCTPMessage(bytes, s);
+                synchronized (s) {
+                    int mseq = s.getNextMessageSeqOut();
+                    s.setNextMessageSeqOut(mseq + 1);
+                    m.setSeq(mseq);
+                }
             }
         }
         return m;
@@ -267,6 +272,11 @@ public class ThreadedAssociation extends Association implements Runnable {
         if (super.canSend()) {
             if (bytes.length() < this.maxMessageSize()) {
                 m = new SCTPMessage(bytes, s);
+                synchronized (s) {
+                    int mseq = s.getNextMessageSeqOut();
+                    s.setNextMessageSeqOut(mseq + 1);
+                    m.setSeq(mseq);
+                }
             }
         }
         return m;

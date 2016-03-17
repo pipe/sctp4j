@@ -553,12 +553,10 @@ abstract public class Association {
 
         Integer sno = dc.getStreamId();
         long tsn = dc.getTsn();
-        boolean newStream = false;
         SCTPStream in = _streams.get(sno);
         if (in == null) {
             in = mkStream(sno);
             _streams.put(sno, in);
-            newStream = true;
             _al.onRawStream(in);
         }
         Chunk[] repa;
@@ -622,7 +620,7 @@ abstract public class Association {
         return rep.toArray(dummy);
     }
 // todo should be in a behave block
-
+// then we wouldn't be messing with stream seq numbers.
     private Chunk[] dcepDeal(SCTPStream s, DataChunk dc, DCOpen dcep) {
         Chunk[] rep = null;
         Log.debug("dealing with a decp for stream " + dc.getDataAsString());
@@ -632,9 +630,12 @@ abstract public class Association {
             SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
             s.setBehave(behave);
             s.setLabel(dcep.getLabel());
-            int seq = s.getNextSeq();
-            s.setNextSeq(seq + 1);
-
+            synchronized (s) {
+                int seqIn = s.getNextMessageSeqIn();
+                s.setNextMessageSeqIn(seqIn + 1);
+                int seqOut = s.getNextMessageSeqOut();
+                s.setNextMessageSeqOut(seqOut + 1);
+            }
             rep = new Chunk[1];
             DataChunk ack = dc.mkAck(dcep);
             s.outbound(ack);
@@ -646,8 +647,12 @@ abstract public class Association {
             Log.debug("got a dcep ack for " + s.getLabel());
             SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
             s.setBehave(behave);
-            int seq = s.getNextSeq();
-            s.setNextSeq(seq + 1);
+            synchronized (s) {
+                int seqIn = s.getNextMessageSeqIn();
+                s.setNextMessageSeqIn(seqIn + 1);
+                int seqOut = s.getNextMessageSeqOut();
+                s.setNextMessageSeqOut(seqOut + 1);
+            }
         }
         return rep;
     }

@@ -31,8 +31,7 @@ public class SCTPMessage {
     private final byte[] _data;
     private int _offset = 0;
     private int _pPid = 0;
-    private int _hiSeq; // note do we need these ?
-    private int _loSeq;
+    private int _mseq; // note do we need these ?
 
     /**
      * Outbound message - note that we assume no one will mess with data between
@@ -61,10 +60,6 @@ public class SCTPMessage {
         }
         if ((chunks.last().getFlags() & DataChunk.ENDFLAG) == 0) {
             throw new IllegalArgumentException("must end with 'end' chunk");
-        }
-        int count = chunks.last().getSSeqNo() - chunks.first().getSSeqNo();
-        if (chunks.size() != count + 1) {
-            throw new IllegalArgumentException("chunk count is wrong " + chunks.size() + " vs " + count);
         }
         _pPid = chunks.first().getPpid();
         for (DataChunk dc : chunks) {
@@ -108,8 +103,6 @@ public class SCTPMessage {
      * @param dc
      */
     public void fill(DataChunk dc) {
-        boolean last = false;
-        boolean first = false;
         int dsz = dc.getCapacity();
         int remain = _data.length - _offset;
         if (_offset == 0) {
@@ -118,37 +111,28 @@ public class SCTPMessage {
                 dc.setFlags(dc.SINGLEFLAG);
                 dc.setData(_data);
                 _offset = _data.length;
-                last = true;
-                first = true;
             } else {
                 // first chunk of many
                 dc.setFlags(dc.BEGINFLAG);
                 dc.setData(_data, _offset, dsz);
                 _offset += dsz;
-                first = true;
             }
-        } else // not first
-        if (remain <= dsz) {
-            // last chunk, this will all fit.
-            dc.setFlags(dc.ENDFLAG);
-            dc.setData(_data, _offset, remain);
-            _offset += remain; // should be _data_length now
-            last = true;
-        } else {
-            // middle chunk.
-            dc.setFlags(0);
-            dc.setData(_data, _offset, dsz);
-            _offset += dsz;
+        } else {// not first
+            if (remain <= dsz) {
+                // last chunk, this will all fit.
+                dc.setFlags(dc.ENDFLAG);
+                dc.setData(_data, _offset, remain);
+                _offset += remain; // should be _data_length now
+            } else {
+                // middle chunk.
+                dc.setFlags(0);
+                dc.setData(_data, _offset, dsz);
+                _offset += dsz;
+            }
         }
         dc.setPpid(_pPid);
-
+        dc.setsSeqNo(_mseq);
         _stream.outbound(dc);
-        if (last) {
-            _hiSeq = dc.getSSeqNo();
-        }
-        if (first) {
-            _loSeq = dc.getSSeqNo();
-        }
     }
 
     public boolean deliver(SCTPStreamListener li) {
@@ -164,7 +148,7 @@ public class SCTPMessage {
             }
         }
         if (!delivered) {
-            Log.debug("Undelivered message to " + (_stream == null?"null stream":_stream.getLabel())+" via "+(li==null ? "null listener":li.getClass().getSimpleName())+ " ppid is "+_pPid);
+            Log.debug("Undelivered message to " + (_stream == null ? "null stream" : _stream.getLabel()) + " via " + (li == null ? "null listener" : li.getClass().getSimpleName()) + " ppid is " + _pPid);
         }
         return delivered;
     }
@@ -172,5 +156,10 @@ public class SCTPMessage {
     public byte[] getData() {
         return _data;
     }
+
+    public void setSeq(int mseq) {
+        _mseq = mseq;
+    }
+
 
 }
