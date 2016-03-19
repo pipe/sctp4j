@@ -42,7 +42,10 @@ public class OrderedStreamBehaviour implements SCTPStreamBehaviour {
         for (DataChunk dc : stash) {
             int flags = dc.getFlags() & DataChunk.SINGLEFLAG; // mask to the bits we want
             long tsn = dc.getTsn();
-            if (tsn != expectedTsn) {
+            boolean lookingForOrderedMessages = _ordered || (message != null);
+            // which is to say for unordered messages we can tolerate gaps _between_ messages
+            // but not within them
+            if (lookingForOrderedMessages && (tsn != expectedTsn)) {
                 Log.debug("Hole in chunk sequence  " + tsn + " expected " + expectedTsn);
                 break;
             }
