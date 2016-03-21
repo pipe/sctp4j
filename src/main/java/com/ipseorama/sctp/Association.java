@@ -130,7 +130,7 @@ abstract public class Association {
     private int MAXSTREAMS = 1000;
     private int _maxOutStreams;
     private int _maxInStreams;
-    final static int MAXBUFF = 128 * 1024;
+    final static int MAXBUFF = 20 * 1024;
     public long _nearTSN;
     private int _srcPort;
     private int _destPort;
@@ -221,6 +221,8 @@ abstract public class Association {
             }
         };
         _rcv = new Thread(r);
+        _rcv.setPriority(Thread.MAX_PRIORITY);
+        _rcv.setName("AssocRcv");
         _rcv.start();
     }
 

@@ -43,7 +43,7 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
  */
 public class ThreadedAssociation extends Association implements Runnable {
 
-    final static int MAXBLOCKS = 128; // some number....
+    final static int MAXBLOCKS = 20; // some number....
     private ArrayBlockingQueue<DataChunk> _freeBlocks;
     private HashMap<Long, DataChunk> _inFlight;
     private long _lastCumuTSNAck;
@@ -650,9 +650,9 @@ public class ThreadedAssociation extends Association implements Runnable {
     public void run() {
         if (canSend()) {
             long now = System.currentTimeMillis();
-            Log.debug("retry timer went off at " + now);
+            Log.verb("retry timer went off at " + now);
             ArrayList<DataChunk> dcs = new ArrayList();
-            int space = _transpMTU;
+            int space = _transpMTU - 12 ; // room for packet header
             boolean resetTimer = false;
             synchronized (_inFlight) {
                 for (Long k : _inFlight.keySet()) {
@@ -662,16 +662,17 @@ public class ThreadedAssociation extends Association implements Runnable {
                         continue;
                     }
                     if (d.getRetryTime() <= now) {
-                        dcs.add(d);
-                        d.setRetryTime(now + getT3() - 1);
                         space -= d.getChunkLength();
                         Log.debug("available space in pkt is " + space);
                         if (space <= 0) {
                             resetTimer = true;
                             break;
+                        } else {
+                            dcs.add(d);
+                            d.setRetryTime(now + getT3() - 1);
                         }
                     } else {
-                        Log.debug("retry not yet due for  " + d.toString());
+                        Log.verb("retry not yet due for  " + d.toString());
                         resetTimer = true;
                     }
                 }
@@ -695,11 +696,11 @@ public class ThreadedAssociation extends Association implements Runnable {
                     Log.error("Cant send retry - eek " + ex.toString());
                 }
             } else {
-                Log.debug("Nothing to do ");
+                Log.verb("Nothing to do ");
             }
             if (resetTimer) {
                 _timer.setRunnable(this, getT3());
-                Log.debug("Try again in a while  ");
+                Log.verb("Try again in a while  ");
 
             }
         }

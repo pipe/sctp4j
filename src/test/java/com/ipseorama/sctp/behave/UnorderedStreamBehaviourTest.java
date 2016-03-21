@@ -6,6 +6,7 @@
 package com.ipseorama.sctp.behave;
 
 import com.ipseorama.sctp.Association;
+import com.ipseorama.sctp.SCTPMessage;
 import com.ipseorama.sctp.SCTPStream;
 import com.ipseorama.sctp.SCTPStreamListener;
 import com.ipseorama.sctp.messages.DataChunk;
@@ -57,6 +58,11 @@ public class UnorderedStreamBehaviourTest {
             @Override
             public void send(String message) throws Exception {
                 throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            @Override
+            public void deliverMessage(SCTPMessage message) {
+                message.run();
             }
         };
     }

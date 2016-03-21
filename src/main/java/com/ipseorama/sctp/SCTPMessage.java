@@ -25,13 +25,15 @@ import java.util.SortedSet;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-public class SCTPMessage {
+public class SCTPMessage implements Runnable {
 
     private final SCTPStream _stream;
     private final byte[] _data;
     private int _offset = 0;
     private int _pPid = 0;
     private int _mseq; // note do we need these ?
+    private SCTPStreamListener _li;
+    private boolean _delivered;
 
     /**
      * Outbound message - note that we assume no one will mess with data between
@@ -136,21 +138,11 @@ public class SCTPMessage {
     }
 
     public boolean deliver(SCTPStreamListener li) {
-        boolean delivered = false;
-        if (li != null) {
-            if ((li instanceof SCTPByteStreamListener) && (_pPid == DataChunk.WEBRTCBINARY)) {
-                ((SCTPByteStreamListener) li).onMessage(_stream, _data);
-                delivered = true;
-            }
-            if (_pPid == DataChunk.WEBRTCSTRING) {
-                li.onMessage(_stream, new String(_data));
-                delivered = true;
-            }
-        }
-        if (!delivered) {
-            Log.debug("Undelivered message to " + (_stream == null ? "null stream" : _stream.getLabel()) + " via " + (li == null ? "null listener" : li.getClass().getSimpleName()) + " ppid is " + _pPid);
-        }
-        return delivered;
+        _li = li;
+        _delivered = false;
+        Log.debug("delegating message delivery to stream of type " + _stream.getClass().getSimpleName());
+        _stream.deliverMessage(this);
+        return true;
     }
 
     public byte[] getData() {
@@ -161,5 +153,22 @@ public class SCTPMessage {
         _mseq = mseq;
     }
 
+    @Override
+    public void run() {
+        Log.debug("delegated message delivery from stream of type " + _stream.getClass().getSimpleName());
+        if (_li != null) {
+            if ((_li instanceof SCTPByteStreamListener) && (_pPid == DataChunk.WEBRTCBINARY)) {
+                ((SCTPByteStreamListener) _li).onMessage(_stream, _data);
+                _delivered = true;
+            }
+            if (_pPid == DataChunk.WEBRTCSTRING) {
+                _li.onMessage(_stream, new String(_data));
+                _delivered = true;
+            }
+        }
+        if (!_delivered) {
+            Log.debug("Undelivered message to " + (_stream == null ? "null stream" : _stream.getLabel()) + " via " + (_li == null ? "null listener" : _li.getClass().getSimpleName()) + " ppid is " + _pPid);
+        }
+    }
 
 }

@@ -20,6 +20,8 @@ package com.ipseorama.sctp.small;
 import com.ipseorama.sctp.SCTPMessage;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.SCTPStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  *
@@ -27,16 +29,24 @@ import com.ipseorama.sctp.SCTPStream;
  */
 public class BlockingSCTPStream extends SCTPStream {
 
+    private final ExecutorService _ex_service;
+
     BlockingSCTPStream(Association a, Integer id) {
         super(a, id);
+        _ex_service = Executors.newSingleThreadExecutor();
     }
 
     @Override
     synchronized public void send(String message) throws Exception {
-        Association a =  super.getAssociation();
-        SCTPMessage m = a.makeMessage(message,this);
+        Association a = super.getAssociation();
+        SCTPMessage m = a.makeMessage(message, this);
         a.sendAndBlock(m);
     }
-    
+
+
+    @Override
+    public void deliverMessage(SCTPMessage message) {
+        _ex_service.execute(message); // switch to callable ?
+    }
 
 }

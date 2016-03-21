@@ -25,7 +25,7 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
     private final TransportAddress _dest;
     private boolean _isShutdown;
     private Thread _recvEnqueue;
-    BlockingQueue<byte[]> _packetQueue = new ArrayBlockingQueue<>(10);
+    BlockingQueue<byte[]> _packetQueue = new ArrayBlockingQueue<>(5);
 
     QueuingDatagramTransport(DatagramSocket lds, TransportAddress rta) {
         _ds = lds;
@@ -41,12 +41,12 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
 
     @Override
     public int getReceiveLimit() throws IOException {
-        return 4094; //Math.min(1200,_ds.getReceiveBufferSize());
+        return Math.min(1200,_ds.getReceiveBufferSize());
     }
 
     @Override
     public int getSendLimit() throws IOException {
-        return 4096;// Math.min(1200,_ds.getSendBufferSize());
+        return Math.min(1200,_ds.getSendBufferSize());
     }
 
     @Override
@@ -76,6 +76,10 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
                 if (ret > 0) {
                     byte stack[] = new byte[ret];
                     System.arraycopy(buffer, 0, stack, 0, ret);
+                    if (_packetQueue.remainingCapacity() < 1){
+                         Log.debug("drop oldest");
+                        _packetQueue.poll();
+                    }
                     boolean res = _packetQueue.offer(stack);
                     if (!res) {
                         Log.debug("overflowed stack");

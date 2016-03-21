@@ -135,4 +135,6 @@ public abstract class SCTPStream {
     public int getNextMessageSeqOut() {
         return _nextMessageSeqOut;
     }
+
+    abstract public void deliverMessage(SCTPMessage message); 
 }
