@@ -140,6 +140,7 @@ abstract public class Association {
     protected State _state;
     private HashMap<Long, DataChunk> _holdingPen;
     private static int TICK = 1000; // loop time in rcv
+    static int __assocNo = 1;
 
     ;
 
@@ -222,14 +223,13 @@ abstract public class Association {
         };
         _rcv = new Thread(r);
         _rcv.setPriority(Thread.MAX_PRIORITY);
-        _rcv.setName("AssocRcv");
+        _rcv.setName("AssocRcv"+__assocNo);
         _rcv.start();
     }
 
     public Association(DatagramTransport transport, AssociationListener al) {
         //Log.setLevel(Log.ALL);
         Log.debug("Created an Associaction of type: " + this.getClass().getSimpleName());
-
         _al = al;
         _random = new SecureRandom();
         _myVerTag = _random.nextInt();
@@ -244,6 +244,8 @@ abstract public class Association {
         } else {
             Log.error("Created an Associaction with a null transport somehow...");
         }
+        __assocNo++;
+
     }
 
     /**

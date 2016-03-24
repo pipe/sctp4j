@@ -25,7 +25,7 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
     private final TransportAddress _dest;
     private boolean _isShutdown;
     private Thread _recvEnqueue;
-    BlockingQueue<byte[]> _packetQueue = new ArrayBlockingQueue<>(5);
+    BlockingQueue<byte[]> _packetQueue = new ArrayBlockingQueue<>(7);
 
     QueuingDatagramTransport(DatagramSocket lds, TransportAddress rta) {
         _ds = lds;
@@ -41,12 +41,12 @@ public class QueuingDatagramTransport implements org.bouncycastle.crypto.tls.Dat
 
     @Override
     public int getReceiveLimit() throws IOException {
-        return Math.min(1200,_ds.getReceiveBufferSize());
+        return Math.min(1480,_ds.getReceiveBufferSize());
     }
 
     @Override
     public int getSendLimit() throws IOException {
-        return Math.min(1200,_ds.getSendBufferSize());
+        return Math.min(1480,_ds.getSendBufferSize());
     }
 
     @Override

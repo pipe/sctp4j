@@ -61,6 +61,7 @@ public class DataChunk extends Chunk implements Comparable,Comparator {
     private boolean _gapAck;
     private long _retryTime;
     private int _retryCount;
+    private long _sentTime;
 
     public DataChunk(byte type, byte flags, int length, ByteBuffer pkt) {
         super(type, flags, length, pkt);
@@ -276,7 +277,7 @@ public class DataChunk extends Chunk implements Comparable,Comparator {
     }
 
     public static int getCapacity() {
-        return 256; // shrug - needs to be less than the theoretical MTU or slow start fails.
+        return 1024; // shrug - needs to be less than the theoretical MTU or slow start fails.
     }
 
     public void setData(byte[] data) {
@@ -320,6 +321,14 @@ public class DataChunk extends Chunk implements Comparable,Comparator {
     @Override
     public int compare(Object o1, Object o2) {
         return (int) (((DataChunk)o1)._tsn - ((DataChunk)o2)._tsn);
+    }
+
+    public long getSentTime() {
+        return _sentTime;
+    }
+
+    public void setSentTime(long now) {
+        _sentTime = now;
     }
         
 }

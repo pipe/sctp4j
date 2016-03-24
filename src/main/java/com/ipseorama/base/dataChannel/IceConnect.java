@@ -9,6 +9,7 @@ import com.ipseorama.base.certHolders.CertHolder;
 import com.ipseorama.base.certHolders.JksCertHolder;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.AssociationListener;
+import com.ipseorama.sctp.leakey.LeakyAssociation;
 import com.ipseorama.sctp.small.ThreadedAssociation;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
@@ -210,7 +211,7 @@ public class IceConnect implements PropertyChangeListener {
 
     public DatagramTransport mkTransport(DatagramSocket lds, TransportAddress rta) {
         final IceConnect ic = this;
-        return new QueuingDatagramTransport(lds, rta) {
+        return new PlainDatagramTransport(lds, rta) {
             @Override
             public void close() throws IOException {
                 Log.debug("close called on Datagram transport");

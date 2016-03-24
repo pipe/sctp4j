@@ -34,12 +34,12 @@ public class PlainDatagramTransport implements org.bouncycastle.crypto.tls.Datag
 
     @Override
     public int getReceiveLimit() throws IOException {
-        return 1200;
+        return Math.min(1480,_ds.getReceiveBufferSize());
     }
 
     @Override
     public int getSendLimit() throws IOException {
-        return 1200;
+        return Math.min(1480,_ds.getSendBufferSize());
     }
 
 

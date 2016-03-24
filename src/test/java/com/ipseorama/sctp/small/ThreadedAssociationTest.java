@@ -15,9 +15,12 @@ import com.ipseorama.sctp.behave.OrderedStreamBehaviour;
 import com.phono.srtplight.Log;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -31,13 +34,16 @@ import static org.junit.Assert.*;
  * @author tim
  */
 public class ThreadedAssociationTest {
+    private static Vector<DatagramTransport> __transList;
 
     public ThreadedAssociationTest() {
+       
     }
 
     @BeforeClass
     public static void setUpClass() {
         Log.setLevel(Log.WARN);
+        __transList = new Vector<DatagramTransport>();
     }
 
     @AfterClass
@@ -50,14 +56,24 @@ public class ThreadedAssociationTest {
 
     @After
     public void tearDown() {
+        for(DatagramTransport t:__transList){
+            try {
+                t.close();
+            } catch (IOException ex) {
+                Log.warn(ex.getMessage());
+            }
+        } 
+        __transList.clear();
     }
 
     private DatagramTransport[] mkMockTransports() {
-        BlockingQueue<byte[]> left = new ArrayBlockingQueue<>(10);
-        BlockingQueue<byte[]> right = new ArrayBlockingQueue<>(10);
+        BlockingQueue<byte[]> left = new ArrayBlockingQueue<>(20);
+        BlockingQueue<byte[]> right = new ArrayBlockingQueue<>(20);
         DatagramTransport[] ret = new DatagramTransport[2];
         ret[0] = new MockTransport(left, right);
         ret[1] = new MockTransport(right, left);
+        __transList.add(ret[0]);
+        __transList.add(ret[1]);
         return ret;
     }
 
@@ -104,7 +120,7 @@ public class ThreadedAssociationTest {
 
         @Override
         public int getReceiveLimit() throws IOException {
-            return 2400;
+            return 1200;
         }
 
         @Override
@@ -429,7 +445,7 @@ public class ThreadedAssociationTest {
         }
         int id = 10;
         String label = "test Stream";
-        SCTPStream s = instanceLeft.mkStream(id, label);
+        final SCTPStream s = instanceLeft.mkStream(id, label);
         synchronized (rightLabel) {
             rightLabel.wait(2000);
             assertEquals (rightLabel.toString(),label);
@@ -438,11 +454,23 @@ public class ThreadedAssociationTest {
         BlockingSCTPStream bs = (BlockingSCTPStream) s;
         StringBuffer longTestMessage = new StringBuffer();
         for (int i=0;i< 10000;i++){
-            longTestMessage.append(""+i);
+            longTestMessage.append(" "+i);
         }
-        String testString = longTestMessage.toString();
+        final String testString = longTestMessage.toString();
         System.out.println("-------> String length = "+testString.length());
-        s.send(testString);
+        Runnable send = new Runnable(){
+            @Override
+            public void run() {
+                try {
+                    s.send(testString);
+                } catch (Exception ex) {
+                    Log.warn(ex.getMessage());
+                }
+            }
+        };
+        Thread st = new Thread(send,"sender ");
+        st.start();
+        
         synchronized (rightout) {
             rightout.wait(10000);
             assertEquals (testString,rightout.toString());

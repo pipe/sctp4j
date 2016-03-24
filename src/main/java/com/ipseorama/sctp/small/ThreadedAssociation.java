@@ -43,13 +43,12 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
  */
 public class ThreadedAssociation extends Association implements Runnable {
 
-    final static int MAXBLOCKS = 20; // some number....
+    final static int MAXBLOCKS = 200; // some number....
     private ArrayBlockingQueue<DataChunk> _freeBlocks;
     private HashMap<Long, DataChunk> _inFlight;
     private long _lastCumuTSNAck;
     final static int MAX_INIT_RETRANS = 8;
-    // a guess at the round-trip time
-    private long _rto = 200;
+
 
     /*   
      o  Receiver advertised window size (rwnd, in bytes), which is set by
@@ -122,15 +121,33 @@ public class ThreadedAssociation extends Association implements Runnable {
     private int _transpMTU = 768;
     private final SimpleSCTPTimer _timer;
     private Chunk[] _stashCookieEcho;
+    private final Object _congestion = new Object();
+    private boolean _firstRTT = true;
+    private double _srtt;
+    private double _rttvar;
+    private double _rto = 3.0;
+
+    /*
+     RTO.Initial - 3 seconds
+     RTO.Min - 1 second
+     RTO.Max - 60 seconds
+     Max.Burst - 4
+     RTO.Alpha - 1/8
+     RTO.Beta - 1/4
+     */
+    private final double _rtoBeta = 250.0;
+    private final double _rtoAlpha = 125.0;
+    private final double _rtoMin = 1.0;
+    private final double _rtoMax = 60.0;
 
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
         super(transport, al);
-        /*try {
-         _transpMTU = Math.min(transport.getReceiveLimit(), transport.getSendLimit());
-         Log.debug("Transport MTU is now " + _transpMTU);
-         } catch (IOException x) {
-         Log.warn("Failed to get suitable transport mtu ");
-         }*/
+        try {
+            _transpMTU = Math.min(transport.getReceiveLimit(), transport.getSendLimit());
+            Log.debug("Transport MTU is now " + _transpMTU);
+        } catch (IOException x) {
+            Log.warn("Failed to get suitable transport mtu ");
+        }
         _freeBlocks = new ArrayBlockingQueue(MAXBLOCKS);
         _inFlight = new HashMap(MAXBLOCKS);
 
@@ -139,11 +156,6 @@ public class ThreadedAssociation extends Association implements Runnable {
             _freeBlocks.add(dc);
         }
         resetCwnd();
-        try {
-            _transpMTU = transport.getSendLimit();
-        } catch (IOException ex) {
-            ;
-        }
         _timer = new SimpleSCTPTimer();
 
     }
@@ -191,7 +203,7 @@ public class ThreadedAssociation extends Association implements Runnable {
                     }
                     retries++;
                     if (retries < MAX_INIT_RETRANS) {
-                        init.setRunnable(this, _rto);
+                        init.setRunnable(this, getT1());
                     }
                 } else {
                     Log.debug("T1 init timer expired with nothing to do");
@@ -207,17 +219,20 @@ public class ThreadedAssociation extends Association implements Runnable {
     }
 
     public long getT3() {
-        return this._rto * 2; // todo - proper estimate 
+        return (long) (1000.0 * _rto);
     }
 
     @Override
     public void enqueue(DataChunk d) {
         // todo - this worries me - 2 nested synchronized 
+        Log.verb(" Aspiring to enqueue " + d.toString());
+
         synchronized (this) {
             long now = System.currentTimeMillis();
             d.setTsn(_nearTSN++);
             d.setGapAck(false);
             d.setRetryTime(now + getT3() - 1);
+            d.setSentTime(now);
             _timer.setRunnable(this, getT3());
             reduceRwnd(d.getDataSize());
             //_outbound.put(new Long(d.getTsn()), d);
@@ -227,9 +242,12 @@ public class ThreadedAssociation extends Association implements Runnable {
             Chunk[] toSend = addSackIfNeeded(d);
             try {
                 send(toSend);
+                Log.verb("sent, syncing on inFlight... " + d.getTsn());
                 synchronized (_inFlight) {
                     _inFlight.put(new Long(d.getTsn()), d);
                 }
+                Log.verb("added to inFlight... " + d.getTsn());
+
             } catch (SctpPacketFormatException ex) {
                 Log.error("badly formatted chunk " + d.toString());
             } catch (java.io.EOFException end) {
@@ -238,6 +256,8 @@ public class ThreadedAssociation extends Association implements Runnable {
                 Log.error("Can not send chunk " + d.toString());
             }
         }
+        Log.verb("leaving enqueue" + d.getTsn());
+
     }
 
     @Override
@@ -245,6 +265,15 @@ public class ThreadedAssociation extends Association implements Runnable {
         while (m.hasMoreData()) {
             DataChunk dc = _freeBlocks.take();
             m.fill(dc);
+            Log.verb("thinking about waiting for congestion " + dc.getTsn());
+
+            synchronized (_congestion) {
+                Log.verb("In congestion sync block ");
+                while (!this.maySend(dc.getDataSize())) {
+                    Log.verb("about to wait for congestion for " + this.getT3());
+                    _congestion.wait(this.getT3());// wholly wrong
+                }
+            }
             // todo check rollover - will break at maxint.
             enqueue(dc);
         }
@@ -408,7 +437,7 @@ public class ThreadedAssociation extends Association implements Runnable {
         if (sack.getCumuTSNAck() >= this._lastCumuTSNAck) {
             long ackedTo = sack.getCumuTSNAck();
             int totalAcked = 0;
-
+            long now = System.currentTimeMillis();
             // interesting SACK
             // process acks
             synchronized (_inFlight) {
@@ -421,6 +450,12 @@ public class ThreadedAssociation extends Association implements Runnable {
                 for (Long k : removals) {
                     DataChunk d = _inFlight.remove(k);
                     totalAcked += d.getDataSize();
+                    /*
+                     todo     IMPLEMENTATION NOTE: RTT measurements should only be made using
+                     a chunk with TSN r if no chunk with TSN less than or equal to r
+                     is retransmitted since r is first sent.
+                     */
+                    setRTO(now - d.getSentTime());
                     try {
                         // todo Notify stream that this one is acked
                         _freeBlocks.put(d);
@@ -498,17 +533,23 @@ public class ThreadedAssociation extends Association implements Runnable {
      long idle period MUST be set to min(4*MTU, max (2*MTU, 4380
      bytes)).
      */
-    private void resetCwnd() {
+    protected void resetCwnd() {
 
         _cwnd = Math.min(4 * _transpMTU, Math.max(2 * _transpMTU, 4380));
+        synchronized (_congestion) {
+            _congestion.notifyAll();
+        }
     }
     /*
      o  The initial cwnd after a retransmission timeout MUST be no more
      than 1*MTU.
      */
 
-    private void setCwndPostRetrans() {
+    protected void setCwndPostRetrans() {
         _cwnd = _transpMTU;
+        synchronized (_congestion) {
+            _congestion.notifyAll();
+        }
     }
     /*
     
@@ -527,7 +568,14 @@ public class ThreadedAssociation extends Association implements Runnable {
      have cwnd bytes of data outstanding on that transport address.
      */
     boolean maySend(int sz) {
-        return (sz <= _cwnd);
+        // todo somehow take account of stuff sent without and sacks yet.......
+        boolean maysend = (sz <= _rwnd);
+        if (!maysend) {
+            maysend = (sz <= _cwnd);
+            _cwnd -= sz;
+        }
+        Log.debug("MaySend " + maysend + " rwnd = " + _rwnd + " cwnd = " + _cwnd + " sz = " + sz);
+        return maysend;
     }
 
     /*
@@ -543,7 +591,7 @@ public class ThreadedAssociation extends Association implements Runnable {
      path MTU.  This upper bound protects against the ACK-Splitting
      attack outlined in [SAVAGE99].
      */
-    void adjustCwind(boolean didAdvance, int inFlightBytes, int totalAcked) {
+    protected void adjustCwind(boolean didAdvance, int inFlightBytes, int totalAcked) {
         boolean fullyUtilized = ((inFlightBytes - _cwnd) < DataChunk.getCapacity()); // could we fit one more in?
 
         if (_cwnd <= _ssthresh) {
@@ -609,6 +657,9 @@ public class ThreadedAssociation extends Association implements Runnable {
                 }
             }
         }
+        synchronized (_congestion) {
+            _congestion.notifyAll();
+        }
     }
     /*
      In instances where its peer endpoint is multi-homed, if an endpoint
@@ -652,7 +703,7 @@ public class ThreadedAssociation extends Association implements Runnable {
             long now = System.currentTimeMillis();
             Log.verb("retry timer went off at " + now);
             ArrayList<DataChunk> dcs = new ArrayList();
-            int space = _transpMTU - 12 ; // room for packet header
+            int space = _transpMTU - 12; // room for packet header
             boolean resetTimer = false;
             synchronized (_inFlight) {
                 for (Long k : _inFlight.keySet()) {
@@ -707,7 +758,111 @@ public class ThreadedAssociation extends Association implements Runnable {
     }
 
     private long getT1() {
-        return this._rto * 10;
+        return (long) (_rto * 1000) * 10;
     }
 
+    /*
+     6.3.1.  RTO Calculation
+
+     The rules governing the computation of SRTT, RTTVAR, and RTO are as
+     follows:
+    
+     C1)  Until an RTT measurement has been made for a packet sent to the
+     given destination transport address, set RTO to the protocol
+     parameter 'RTO.Initial'.
+     */
+    // a guess at the round-trip time
+    private  void setRTOnonRFC(long r) {
+        _rto = 0.2;
+    }
+
+    private  void setRTO(long r) {
+        double nrto = 1.0;
+        double cr = r / 1000.0;
+        /*
+         C2)  When the first RTT measurement R is made, set
+
+         SRTT <- R,
+
+         RTTVAR <- R/2, and
+
+         RTO <- SRTT + 4 * RTTVAR.
+         */
+        if (_firstRTT) {
+            _firstRTT = false;
+            _srtt = cr;
+            _rttvar = cr / 2;
+            nrto = _srtt + (4 * _rttvar);
+        } else {
+            /*
+             C3)  When a new RTT measurement R' is made, set
+
+             RTTVAR <- (1 - RTO.Beta) * RTTVAR + RTO.Beta * |SRTT - R'|
+
+             and
+
+             SRTT <- (1 - RTO.Alpha) * SRTT + RTO.Alpha * R'
+
+             Note: The value of SRTT used in the update to RTTVAR is its
+             value before updating SRTT itself using the second assignment.
+
+             After the computation, update RTO <- SRTT + 4 * RTTVAR.
+             */
+            _rttvar = (1 - _rtoBeta) * _rttvar + _rtoBeta * Math.abs(_srtt - cr);
+            _srtt = (1 - _rtoAlpha) * _srtt + _rtoAlpha * cr;
+            nrto = _srtt + 4 * _rttvar;
+        }
+        Log.debug("candidate  rto is " + nrto);
+
+        if (nrto < _rtoMin) {
+            Log.debug("clamping min rto as " + nrto + " < " + _rtoMin);
+            nrto = _rtoMin;
+        }
+        if (nrto > _rtoMax) {
+            Log.debug("clamping max rto as " + nrto + " > " + _rtoMax);
+            nrto = _rtoMax;
+        }
+        _rto = nrto;
+        Log.debug("new rto is " + _rto);
+        /*
+
+
+         Stewart                     Standards Track                    [Page 83]
+ 
+         RFC 4960          Stream Control Transmission Protocol    September 2007
+
+
+         C4)  When data is in flight and when allowed by rule C5 below, a new
+         RTT measurement MUST be made each round trip.  Furthermore, new
+         RTT measurements SHOULD be made no more than once per round trip
+         for a given destination transport address.  There are two
+         reasons for this recommendation: First, it appears that
+         measuring more frequently often does not in practice yield any
+         significant benefit [ALLMAN99]; second, if measurements are made
+         more often, then the values of RTO.Alpha and RTO.Beta in rule C3
+         above should be adjusted so that SRTT and RTTVAR still adjust to
+         changes at roughly the same rate (in terms of how many round
+         trips it takes them to reflect new values) as they would if
+         making only one measurement per round-trip and using RTO.Alpha
+         and RTO.Beta as given in rule C3.  However, the exact nature of
+         these adjustments remains a research issue.
+
+         C5)  Karn's algorithm: RTT measurements MUST NOT be made using
+         packets that were retransmitted (and thus for which it is
+         ambiguous whether the reply was for the first instance of the
+         chunk or for a later instance)
+
+         IMPLEMENTATION NOTE: RTT measurements should only be made using
+         a chunk with TSN r if no chunk with TSN less than or equal to r
+         is retransmitted since r is first sent.
+
+         C6)  Whenever RTO is computed, if it is less than RTO.Min seconds
+         then it is rounded up to RTO.Min seconds.  The reason for this
+         rule is that RTOs that do not have a high minimum value are
+         susceptible to unnecessary timeouts [ALLMAN99].
+
+         C7)  A maximum value may be placed on RTO provided it is at least
+         RTO.max seconds.
+         */
+    }
 }
