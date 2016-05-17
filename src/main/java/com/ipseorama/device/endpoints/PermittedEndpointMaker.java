@@ -68,6 +68,13 @@ public abstract class PermittedEndpointMaker implements PermittedAssociationList
                             sl = new ErrorEndpoint(s);
                         }
                         break;
+                    case "shell":
+                        //if (_certMaker.isMaster(_farFinger)) {
+                            sl = new ShellEndpoint(s);
+                        //} else {
+                        //    sl = new ErrorEndpoint(s);
+                        //}
+                        break;
                     default:
                         sl = mkEndpointForLabel(lab, s);
                 }
