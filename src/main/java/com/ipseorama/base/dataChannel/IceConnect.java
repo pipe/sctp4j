@@ -30,7 +30,10 @@ import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.function.Consumer;
+import javax.json.JsonObject;
 import org.bouncycastle.crypto.tls.DTLSTransport;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.ice4j.ice.Candidate;
@@ -39,6 +42,7 @@ import org.ice4j.ice.CandidatePairState;
 import org.ice4j.ice.CandidateType;
 import org.ice4j.ice.Component;
 import org.ice4j.ice.IceProcessingState;
+import org.ice4j.ice.LocalCandidate;
 import org.ice4j.ice.RemoteCandidate;
 import org.ice4j.ice.harvest.TrickleCallback;
 import org.ice4j.socket.DTLSDatagramFilter;
@@ -526,7 +530,18 @@ public class IceConnect implements PropertyChangeListener,IceConnectFace {
     }
 
     @Override
-    public void startCandidateTrickle(TrickleCallback tcb) {
+    public void startCandidateTrickle(Consumer cons) {
+                TrickleCallback tcb = new TrickleCallback() {
+            @Override
+            public void onIceCandidates(Collection<LocalCandidate> clctn) {
+                if (clctn != null) {
+                    for (Candidate c : clctn) {
+                        haveLocalCandy(true);
+                        cons.accept(c);
+                    }
+                }
+            }
+        };
         this._localAgent.startCandidateTrickle(tcb);
     }
 

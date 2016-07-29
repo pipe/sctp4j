@@ -24,13 +24,12 @@ import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableEntryException;
 import java.security.cert.CertificateException;
-import java.util.Collection;
 import java.util.List;
+import java.util.function.Consumer;
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
@@ -39,9 +38,6 @@ import javax.json.JsonObjectBuilder;
 import javax.json.JsonValue;
 import org.ice4j.TransportAddress;
 import org.ice4j.ice.Candidate;
-import org.ice4j.ice.CandidateType;
-import org.ice4j.ice.LocalCandidate;
-import org.ice4j.ice.harvest.TrickleCallback;
 
 /**
  *
@@ -49,7 +45,7 @@ import org.ice4j.ice.harvest.TrickleCallback;
  */
 public class IceConnectJSON {
 
-    private String _session, _to, _type, _mid;
+    public String _session, _to, _type, _mid;
     private String _us;
     IceConnectFace _ice;
     public PropertyChangeListener onPropertyChange;
@@ -59,36 +55,31 @@ public class IceConnectJSON {
             @Override
             public void propertyChange(PropertyChangeEvent evt) {
                 super.propertyChange(evt);
-                if (onPropertyChange != null){
+                if (onPropertyChange != null) {
                     onPropertyChange.propertyChange(evt);
                 }
             }
         };
         _us = cert.getPrint(false);
     }
-    public IceConnectJSON(IceConnectFace ice){
+
+    public IceConnectJSON(IceConnectFace ice) {
         _ice = ice;
+        _us = _ice.getPrint().replace(":", "");
+
     }
-    
 
     public void setCleanupCB(Runnable clean) {
         _ice.setCleanup(clean);
     }
 
     public void startIce(final CandidateSender cs) {
-        TrickleCallback tcb = new TrickleCallback() {
-            @Override
-            public void onIceCandidates(Collection<LocalCandidate> clctn) {
-                if (clctn != null) {
-                    for (Candidate c : clctn) {
-                        _ice.haveLocalCandy(true);
-                        JsonObject j = buildCandidateJson(c);
-                        cs.sendCandidate(j);
-                    }
-                }
-            }
+
+        Consumer<Object> cons = (c) -> {
+            JsonObject j = buildCandidateJson((Candidate) c);
+            cs.sendCandidate(j);
         };
-        _ice.startCandidateTrickle(tcb);
+        _ice.startCandidateTrickle(cons);
         _ice.startIce();
 
     }

@@ -8,9 +8,8 @@ package com.ipseorama.base.dataChannel;
 import com.ipseorama.sctp.AssociationListener;
 import java.io.IOException;
 import java.util.List;
+import java.util.function.Consumer;
 import javax.json.JsonValue;
-import org.ice4j.ice.Candidate;
-import org.ice4j.ice.harvest.TrickleCallback;
 
 /**
  *
@@ -30,7 +29,7 @@ public interface IceConnectFace {
 
     public void addCandidate(String string, String string0, String string1, String string2, String string3, String string4, String string5, String string6, String string7);
 
-    public List<Candidate> getCandidates();
+    public List getCandidates();
 
     public String getUfrag();
 
@@ -48,6 +47,7 @@ public interface IceConnectFace {
 
     public void setCleanup(Runnable clean);
 
-    public void startCandidateTrickle(TrickleCallback tcb);
+
+    public void startCandidateTrickle(Consumer<Object> cons);
     
 }
