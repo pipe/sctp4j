@@ -18,7 +18,10 @@
 package com.ipseorama.base.dataChannel;
 
 import com.ipseorama.base.certHolders.JksCertMaker;
+import com.ipseorama.sctp.AssociationListener;
 import com.phono.srtplight.Log;
+import java.beans.PropertyChangeEvent;
+import java.beans.PropertyChangeListener;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -44,18 +47,32 @@ import org.ice4j.ice.harvest.TrickleCallback;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-public class IceConnectJSON extends IceConnect {
+public class IceConnectJSON {
 
     private String _session, _to, _type, _mid;
     private String _us;
+    IceConnectFace _ice;
+    public PropertyChangeListener onPropertyChange;
 
     public IceConnectJSON(int port, JksCertMaker cert) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
-        super(port, cert);
+        _ice = new IceConnect(port, cert) {
+            @Override
+            public void propertyChange(PropertyChangeEvent evt) {
+                super.propertyChange(evt);
+                if (onPropertyChange != null){
+                    onPropertyChange.propertyChange(evt);
+                }
+            }
+        };
         _us = cert.getPrint(false);
     }
+    public IceConnectJSON(IceConnectFace ice){
+        _ice = ice;
+    }
+    
 
-    public IceConnectJSON(int port) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
-        super(port);
+    public void setCleanupCB(Runnable clean) {
+        _ice.setCleanup(clean);
     }
 
     public void startIce(final CandidateSender cs) {
@@ -64,15 +81,15 @@ public class IceConnectJSON extends IceConnect {
             public void onIceCandidates(Collection<LocalCandidate> clctn) {
                 if (clctn != null) {
                     for (Candidate c : clctn) {
-                        haveLocalCandy(true);
+                        _ice.haveLocalCandy(true);
                         JsonObject j = buildCandidateJson(c);
                         cs.sendCandidate(j);
                     }
                 }
             }
         };
-        _localAgent.startCandidateTrickle(tcb);
-        super.startIce();
+        _ice.startCandidateTrickle(tcb);
+        _ice.startIce();
 
     }
 
@@ -117,27 +134,27 @@ public class IceConnectJSON extends IceConnect {
             JsonObject fpo = ((JsonObject) content).getJsonObject("fingerprint");
             if ("sha-256".equalsIgnoreCase(fpo.getString("hash"))) {
                 String ffp = fpo.getString("print");
-                setFarFingerprint(ffp);
+                _ice.setFarFingerprint(ffp);
             }
             JsonObject media = ((JsonObject) content).getJsonObject("media");
 
             String proto = media.getString("proto");
             _mid = ((JsonObject) content).getString("mid", "data");
             String setup = ((JsonObject) content).getString("setup", "unknown");
-            switch (setup){
-                case "active": 
-                    _dtlsClientRole = false; // ie they are active, so we arent
+            switch (setup) {
+                case "active":
+                    _ice.setDtlsClientRole(false); // ie they are active, so we arent
                     break;
-                case "passive": 
-                    _dtlsClientRole = true; // they are passive, so we have to take the lead
+                case "passive":
+                    _ice.setDtlsClientRole(true); // they are passive, so we have to take the lead
                     break;
                 case "actpass":
-                    _dtlsClientRole = false; // we have a mild preference for going first and
-                        // but this doesn't seem to work - dtls client does not retry correctly
-                        // so for now we will be a passive server
+                    _ice.setDtlsClientRole(false); // we have a mild preference for going first and
+                    // but this doesn't seem to work - dtls client does not retry correctly
+                    // so for now we will be a passive server
                     break;
                 default:
-                    Log.error("Huh? setup type unrecognized "+ setup);
+                    Log.error("Huh? setup type unrecognized " + setup);
                     break;
             }
             if ("DTLS/SCTP".equals(proto)) {
@@ -145,7 +162,7 @@ public class IceConnectJSON extends IceConnect {
                 String ufrag = ice.getString("ufrag");
                 String pass = ice.getString("pwd");
                 try {
-                    buildIce(ufrag, pass);
+                    _ice.buildIce(ufrag, pass);
                 } catch (InterruptedException ex) {
                     Log.error(ex.toString());
                 } catch (IllegalArgumentException ex) {
@@ -158,24 +175,25 @@ public class IceConnectJSON extends IceConnect {
                 }
             }
         }
-        String fp = this.getFarFingerprint();
+        String fp = _ice.getFarFingerprint();
         if (fp == null) {
             throw new IOException("No fingerptint set");
         }
     }
-    private void addJasonCandy(JsonObject jcandy){
-        addCandidate(jcandy.getString("foundation"),
+
+    private void addJasonCandy(JsonObject jcandy) {
+        _ice.addCandidate(jcandy.getString("foundation"),
                 jcandy.getString("component"),
                 jcandy.getString("protocol"),
                 jcandy.getString("priority"),
                 jcandy.getString("ip"),
                 jcandy.getString("port"),
                 jcandy.getString("type"),
-                jcandy.getString("raddr",null),
-                jcandy.getString("rport",null)
+                jcandy.getString("raddr", null),
+                jcandy.getString("rport", null)
         );
     }
-    
+
     public void addRemoteCandidate(JsonObject message) throws IOException {
         String session = message.getString("session");
         String to = message.getString("to");
@@ -187,7 +205,7 @@ public class IceConnectJSON extends IceConnect {
     }
 
     public JsonObject buildCandidateJson(Candidate candy) {
-        String farPrint = getFarFingerprint().replaceAll(":", "");
+        String farPrint = _ice.getFarFingerprint().replaceAll(":", "");
         return Json.createObjectBuilder()
                 .add("to", farPrint)
                 .add("type", "candidate")
@@ -198,25 +216,24 @@ public class IceConnectJSON extends IceConnect {
 
     public JsonObjectBuilder mkCandidateJson(Candidate candy) {
         JsonObjectBuilder ret = Json.createObjectBuilder()
-                .add("foundation", ""+candy.getFoundation())
+                .add("foundation", "" + candy.getFoundation())
                 .add("component", "" + candy.getParentComponent().getComponentID())
                 .add("protocol", candy.getTransport().toString())
-                .add("priority", ""+candy.getPriority())
+                .add("priority", "" + candy.getPriority())
                 .add("ip", candy.getTransportAddress().getHostAddress())
-                .add("port", ""+candy.getTransportAddress().getPort())
+                .add("port", "" + candy.getTransportAddress().getPort())
                 .add("type", candy.getType().toString())
                 .add("generation", "0");
         TransportAddress relAddr = candy.getRelatedAddress();
-        if(relAddr != null)
-        {
-            ret= ret.add("raddr", relAddr.getHostAddress()).add("rport" , ""+relAddr.getPort());
+        if (relAddr != null) {
+            ret = ret.add("raddr", relAddr.getHostAddress()).add("rport", "" + relAddr.getPort());
         }
         return ret;
     }
 
     public JsonArrayBuilder mkCandidates() {
         JsonArrayBuilder ret = Json.createArrayBuilder();
-        List<Candidate> candies = getCandidates();
+        List<Candidate> candies = _ice.getCandidates();
         //{"sdpMLineIndex":1,"sdpMid":"data","candidate":{"foundation":"2169522962","component":"1","protocol":"tcp","priority":"1509957375","ip":"192.67.4.33","port":"0","type":"host","generation":"0\r\n"}
         for (Candidate candy : candies) {
             ret.add(mkCandidateJson(candy));
@@ -225,20 +242,20 @@ public class IceConnectJSON extends IceConnect {
     }
 
     public JsonObject mkAnswer() {
-        return mkSDP("answer", this._dtlsClientRole ? "active":"passive");
+        return mkSDP("answer", _ice.getDtlsClientRole() ? "active" : "passive");
     }
 
     public JsonObject mkOffer() {
-        _offerer = true;
+        _ice.setOfferer(true);
         return mkSDP("offer", "actpass");
     }
 
     public JsonObject mkSDP(String type, String setup) {
-        String farPrint = getFarFingerprint().replaceAll(":", "");
+        String farPrint = _ice.getFarFingerprint().replaceAll(":", "");
         Log.debug("farprint is " + farPrint);
         JsonObject ans = Json.createObjectBuilder()
                 .add("to", farPrint)
-                .add("from",_us)
+                .add("from", _us)
                 .add("type", type)
                 .add("session", _session)
                 .add("sdp", Json.createObjectBuilder()
@@ -249,8 +266,8 @@ public class IceConnectJSON extends IceConnect {
                                         .add("codecs", Json.createArrayBuilder()
                                         )
                                         .add("ice", Json.createObjectBuilder()
-                                                .add("ufrag", getUfrag())
-                                                .add("pwd", getPass())
+                                                .add("ufrag", _ice.getUfrag())
+                                                .add("pwd", _ice.getPass())
                                         )
                                         .add("media", Json.createObjectBuilder()
                                                 .add("type", "application")
@@ -266,7 +283,7 @@ public class IceConnectJSON extends IceConnect {
                                         )
                                         .add("fingerprint", Json.createObjectBuilder()
                                                 .add("hash", "sha-256")
-                                                .add("print", getPrint())
+                                                .add("print", _ice.getPrint())
                                                 .add("required", "1")
                                         )
                                         .add("mid", _mid)
@@ -306,6 +323,10 @@ public class IceConnectJSON extends IceConnect {
         //,"fingerprint":{"hash":"sha-256","print":"C1:8F:6F:80:5B:D6:C4:DF:A6:95:37:78:4E:57:0E:88:42:CB:1D:6A:20:26:07:CC:84:E4:41:C4:36:9A:3B:4D","required":"1"},
         //"mid":"data"}]
         //,"session":{"username":"-","id":"4648475892259889561","ver":"2","nettype":"IN","addrtype":"IP4","address":"127.0.0.1"},"group":{"type":"BUNDLE","contents":["audio","data"]}}} 
+    }
+
+    public void setAssociationListener(AssociationListener al) {
+        _ice.setAssociationListener(al);
     }
 
 }

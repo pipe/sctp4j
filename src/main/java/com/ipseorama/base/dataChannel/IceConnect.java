@@ -40,6 +40,7 @@ import org.ice4j.ice.CandidateType;
 import org.ice4j.ice.Component;
 import org.ice4j.ice.IceProcessingState;
 import org.ice4j.ice.RemoteCandidate;
+import org.ice4j.ice.harvest.TrickleCallback;
 import org.ice4j.socket.DTLSDatagramFilter;
 import org.ice4j.socket.IceSocketWrapper;
 import org.ice4j.socket.MultiplexingDatagramSocket;
@@ -48,7 +49,7 @@ import org.ice4j.socket.MultiplexingDatagramSocket;
  *
  * @author tim
  */
-public class IceConnect implements PropertyChangeListener {
+public class IceConnect implements PropertyChangeListener,IceConnectFace {
 
     private long startTime;
     protected Agent _localAgent;
@@ -68,9 +69,6 @@ public class IceConnect implements PropertyChangeListener {
         this._al = al;
     }
 
-    IceConnect(int port) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
-        this(port, null);
-    }
 
     IceConnect(int port, CertHolder certH) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
         _cert = (certH == null) ? new JksCertHolder() : certH;
@@ -130,7 +128,7 @@ public class IceConnect implements PropertyChangeListener {
         tryToStartIce();
     }
 
-    void buildIce(String ufrag, String upass) throws InterruptedException, IllegalArgumentException, IOException {
+    public void buildIce(String ufrag, String upass) throws InterruptedException, IllegalArgumentException, IOException {
         startTime = System.currentTimeMillis();
 
         long endTime = System.currentTimeMillis();
@@ -150,11 +148,11 @@ public class IceConnect implements PropertyChangeListener {
          + _localAgent.getStream("audio").getCheckList());*/
     }
 
-    String getUfrag() {
+    public String getUfrag() {
         return _localAgent.getLocalUfrag();
     }
 
-    String getPass() {
+    public String getPass() {
         return _localAgent.getLocalPassword();
     }
 
@@ -168,15 +166,15 @@ public class IceConnect implements PropertyChangeListener {
         return ret;
     }
 
-    protected void setFarFingerprint(String ffp) {
+    public void setFarFingerprint(String ffp) {
         _ffp = ffp;
     }
 
-    String getFarFingerprint() {
+    public String getFarFingerprint() {
         return _ffp;
     }
 
-    protected void haveLocalCandy(boolean have) {
+    public void haveLocalCandy(boolean have) {
         _haveLocalCandy |= have;
         if (_haveLocalCandy) {
             tryToStartIce();
@@ -415,7 +413,7 @@ public class IceConnect implements PropertyChangeListener {
         return stream;
     }
 
-    void addCandidate(String foundation, String component, String protocol, String priority, String ip, String port, String type, String raddr, String rport) {
+    public void addCandidate(String foundation, String component, String protocol, String priority, String ip, String port, String type, String raddr, String rport) {
         IceMediaStream localStream = getStream("data");
         List<Component> localComponents = localStream.getComponents();
         int cid = Integer.parseInt(component);
@@ -483,7 +481,7 @@ public class IceConnect implements PropertyChangeListener {
     public static void main(String[] argv) {
         Log.setLevel(Log.DEBUG);
         try {
-            IceConnect ice = new IceConnect(12345);
+            IceConnect ice = new IceConnect(12345,null);
             ice.buildIce("wbrUTaHy7SNtu20y", "jg/ezzHpJSLGJvUB3N8XwXj9");
             ice.addCandidate("2169522962", "1", "udp", "1509957375", "192.67.4.33", "54321", "host", null, null);
             Log.debug("local ufrag " + ice.getUfrag());
@@ -505,6 +503,31 @@ public class IceConnect implements PropertyChangeListener {
             _localAgent.free();
             _localAgent = null;
         }
+    }
+
+    @Override
+    public void setDtlsClientRole(boolean b) {
+        this._dtlsClientRole = b;
+    }
+
+    @Override
+    public boolean getDtlsClientRole() {
+        return this._dtlsClientRole;
+    }
+
+    @Override
+    public void setOfferer(boolean b) {
+        this._offerer = b;
+    }
+
+    @Override
+    public void setCleanup(Runnable clean) {
+        this.cleanup = clean;
+    }
+
+    @Override
+    public void startCandidateTrickle(TrickleCallback tcb) {
+        this._localAgent.startCandidateTrickle(tcb);
     }
 
 }
