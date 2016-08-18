@@ -8,6 +8,7 @@ package com.ipseorama.device.endpoints;
 import com.ipseorama.base.certHolders.JksCertMaker;
 import com.ipseorama.sctp.SCTPStream;
 import com.phono.srtplight.Log;
+import java.math.BigDecimal;
 import java.util.List;
 import javax.json.Json;
 import javax.json.JsonArrayBuilder;
@@ -56,10 +57,17 @@ public class CertManagerEndpoint extends JsonEndpoint {
                 case "list":
                     List<String> list = _cm.listFriends();
                     JsonArrayBuilder ab = Json.createArrayBuilder();
+                    int flen = 0;
+
                     for (String friend : list) {
                         ab.add(friend);
+                        flen += friend.length();
                     }
-                    ret.add("friends", ab);
+                    if (flen < 1024) {
+                        ret.add("friends", ab);
+                    } else {
+                        ret.add("friendCount", list.size());
+                    }
                     break;
                 default:
                     throw new Exception("unknown action");
