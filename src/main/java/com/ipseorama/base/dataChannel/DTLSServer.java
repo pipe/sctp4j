@@ -31,7 +31,7 @@ import org.bouncycastle.crypto.tls.UseSRTPData;
  *
  * @author tim
  */
-abstract class DTLSServer extends
+public abstract class DTLSServer extends
         DefaultTlsServer implements Runnable, DTLSEndpoint {
 
     private DTLSServerProtocol _serverProtocol;

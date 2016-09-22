@@ -71,4 +71,13 @@ public abstract class CertHolder {
         if (withColon) b.deleteCharAt(b.length() - 1);
         return b.toString();
     }
+
+    public String getAlgo() {
+        return ("SHA256withRSA");
+    }
+
+
+    public String getPrintAlgo() {
+        return ("SHA256");
+    }
 }

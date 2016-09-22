@@ -70,7 +70,7 @@ class LeakyTransport implements DatagramTransport {
     @Override
     public int receive(byte[] bytes, int offs, int len, int sleep) throws IOException {
         int sz = _dtls.receive(bytes, offs, len, sleep);
-        if (sz > 0){
+        if (sz > 0) {
             DatagramPacket p = new DatagramPacket(bytes, offs, sz, _logsend.getLocalSocketAddress());
             _logrec.send(p);
         }
@@ -79,8 +79,13 @@ class LeakyTransport implements DatagramTransport {
 
     @Override
     public void send(byte[] bytes, int offs, int len) throws IOException {
-        DatagramPacket p = new DatagramPacket(bytes, offs, len, _logrec.getLocalSocketAddress());
-        _logsend.send(p);
+        try {
+            DatagramPacket p = new DatagramPacket(bytes, offs, len, _logrec.getLocalSocketAddress());
+            _logsend.send(p);
+        } catch (Exception x) {
+            Log.error("can't leak to " + _logrec.getLocalSocketAddress());
+            x.printStackTrace();
+        }
         _dtls.send(bytes, offs, len);
     }
 
