@@ -14,7 +14,7 @@ import org.bouncycastle.crypto.tls.DTLSTransport;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-interface DTLSEndpoint {
+public interface DTLSEndpoint {
     public boolean shouldInitiateAssociation();
     public Association makeAssociation(DTLSTransport trans, AssociationListener li);
 }

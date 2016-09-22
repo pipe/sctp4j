@@ -28,7 +28,7 @@ import org.bouncycastle.crypto.tls.TlsCredentials;
  *
  * @author tim
  */
-abstract class DTLSClient extends
+public abstract class DTLSClient extends
         org.bouncycastle.crypto.tls.DefaultTlsClient implements Runnable, DTLSEndpoint {
 
     private final CertHolder _cert;
