@@ -36,6 +36,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 
 /**
@@ -171,6 +173,8 @@ abstract public class Association {
 
     void deal(Packet rec) throws Exception {
         List<Chunk> cl;
+        Chunk[] s = {};
+        ArrayList<Chunk> replies = new ArrayList();
         rec.validate(this);
         cl = rec.getChunkList();
         for (Chunk c : cl) {
@@ -181,9 +185,24 @@ abstract public class Association {
             _destPort = rec.getSrcPort();
         }
         for (Chunk c : cl) {
-            if (!deal(c)) {
+            if (!deal(c, replies)) {
                 break; // drop the rest of the packet.
             }
+        }
+        // find the highest sack.
+        Optional<Chunk> hisack = replies.stream().filter((Chunk c) -> { return c.getType() == Chunk.SACK; })
+                .sorted((Chunk a, Chunk b) -> { return (int) (((SackChunk)b).getCumuTSNAck() - ((SackChunk)a).getCumuTSNAck());})
+                .findFirst();
+        // remove all sacks
+        replies.removeIf((Chunk c) -> { return c.getType() == Chunk.SACK; });
+        // insert the higest one first.
+        if (hisack.isPresent()){
+            replies.add(0, hisack.get());
+        }
+        try {
+            send(replies.toArray(s));
+        } catch (java.io.EOFException end) {
+            unexpectedClose(end);
         }
     }
 
@@ -223,7 +242,7 @@ abstract public class Association {
         };
         _rcv = new Thread(r);
         _rcv.setPriority(Thread.MAX_PRIORITY);
-        _rcv.setName("AssocRcv"+__assocNo);
+        _rcv.setName("AssocRcv" + __assocNo);
         _rcv.start();
     }
 
@@ -293,7 +312,7 @@ abstract public class Association {
      * @throws IOException
      * @throws SctpPacketFormatException
      */
-    private boolean deal(Chunk c) throws IOException, SctpPacketFormatException {
+    private boolean deal(Chunk c, ArrayList<Chunk> replies) throws IOException, SctpPacketFormatException {
         int ty = c.getType();
         boolean ret = true;
         State oldState = _state;
@@ -331,7 +350,7 @@ abstract public class Association {
                 break;
             case Chunk.DATA:
                 Log.debug("got data " + c.toString());
-                reply = dataDeal((DataChunk) c);
+                reply = dataDeal ((DataChunk) c);
                 break;
             case Chunk.ABORT:
                 // no reply we should just bail I think.
@@ -348,13 +367,12 @@ abstract public class Association {
                 break;
         }
         if (reply != null) {
+            for (Chunk r : reply) {
+                replies.add(r);
+            }
             // theoretically could be multiple DATA in a single packet - 
             // we'd send multiple SACKs in reply - ToDo fix that
-            try {
-                send(reply);
-            } catch (java.io.EOFException end) {
-                unexpectedClose(end);
-            }
+
         }
         if ((_state == State.ESTABLISHED) && (oldState != State.ESTABLISHED)) {
             if (null != _al) {
@@ -625,6 +643,7 @@ abstract public class Association {
     }
 // todo should be in a behave block
 // then we wouldn't be messing with stream seq numbers.
+
     private Chunk[] dcepDeal(SCTPStream s, DataChunk dc, DCOpen dcep) {
         Chunk[] rep = null;
         Log.debug("dealing with a decp for stream " + dc.getDataAsString());
@@ -740,9 +759,6 @@ abstract public class Association {
     }
 
     private SackChunk mkSack(ArrayList<Long> pen, ArrayList<Long> dups) {
-        // Notice that this is the dumbest possible sack implementation
-        // it assumes no gaps, because we ignore unexpected packets in dataDeal()
-        // mucho room for improvement....
         SackChunk ret = new SackChunk();
         ret.setCumuTSNAck(_farTSN);
         int stashcap = calcStashCap();
