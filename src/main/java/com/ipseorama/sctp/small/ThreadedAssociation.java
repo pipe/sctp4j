@@ -306,6 +306,8 @@ public class ThreadedAssociation extends Association implements Runnable {
                     s.setNextMessageSeqOut(mseq + 1);
                     m.setSeq(mseq);
                 }
+            } else {
+                Log.warn("Message too long "+bytes.length() +" > "+this.maxMessageSize());
             }
         }
         return m;
