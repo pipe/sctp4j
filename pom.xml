@@ -57,12 +57,6 @@
             <version>7.0</version>
             <scope>provided</scope>
         </dependency>
-
-<dependency>
-    <groupId>org.jitsi</groupId>
-    <artifactId>ice4j</artifactId>
-    <version>1.1-SNAPSHOT</version>
-</dependency>
 <dependency>
     <groupId>com.phono</groupId>
     <artifactId>srtplight</artifactId>

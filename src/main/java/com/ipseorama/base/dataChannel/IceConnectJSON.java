@@ -36,32 +36,20 @@ import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
 import javax.json.JsonObjectBuilder;
 import javax.json.JsonValue;
-import org.ice4j.TransportAddress;
-import org.ice4j.ice.Candidate;
+
 
 /**
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-public class IceConnectJSON {
+abstract public class IceConnectJSON {
 
     public String _session, _to, _type, _mid;
     private String _us;
     IceConnectFace _ice;
     public PropertyChangeListener onPropertyChange;
 
-    public IceConnectJSON(int port, JksCertMaker cert) throws IOException, UnrecoverableEntryException, KeyStoreException, FileNotFoundException, NoSuchAlgorithmException, CertificateException {
-        _ice = new IceConnect(port, cert) {
-            @Override
-            public void propertyChange(PropertyChangeEvent evt) {
-                super.propertyChange(evt);
-                if (onPropertyChange != null) {
-                    onPropertyChange.propertyChange(evt);
-                }
-            }
-        };
-        _us = cert.getPrint(false);
-    }
+
 
     public IceConnectJSON(IceConnectFace ice) {
         _ice = ice;
@@ -73,16 +61,7 @@ public class IceConnectJSON {
         _ice.setCleanup(clean);
     }
 
-    public void startIce(final CandidateSender cs) {
-
-        Consumer<Object> cons = (c) -> {
-            JsonObject j = buildCandidateJson((Candidate) c);
-            cs.sendCandidate(j);
-        };
-        _ice.startCandidateTrickle(cons);
-        _ice.startIce();
-
-    }
+    abstract public void startIce(final CandidateSender cs) ;
 
     public void setOffer(JsonObject message) throws IOException {
         String offer = message.getString("type");
@@ -195,42 +174,9 @@ public class IceConnectJSON {
         }
     }
 
-    public JsonObject buildCandidateJson(Candidate candy) {
-        String farPrint = _ice.getFarFingerprint().replaceAll(":", "");
-        return Json.createObjectBuilder()
-                .add("to", farPrint)
-                .add("type", "candidate")
-                .add("sdpMLineIndex", "0")
-                .add("session", _session)
-                .add("candidate", mkCandidateJson(candy)).build();
-    }
 
-    public JsonObjectBuilder mkCandidateJson(Candidate candy) {
-        JsonObjectBuilder ret = Json.createObjectBuilder()
-                .add("foundation", "" + candy.getFoundation())
-                .add("component", "" + candy.getParentComponent().getComponentID())
-                .add("protocol", candy.getTransport().toString())
-                .add("priority", "" + candy.getPriority())
-                .add("ip", candy.getTransportAddress().getHostAddress())
-                .add("port", "" + candy.getTransportAddress().getPort())
-                .add("type", candy.getType().toString())
-                .add("generation", "0");
-        TransportAddress relAddr = candy.getRelatedAddress();
-        if (relAddr != null) {
-            ret = ret.add("raddr", relAddr.getHostAddress()).add("rport", "" + relAddr.getPort());
-        }
-        return ret;
-    }
 
-    public JsonArrayBuilder mkCandidates() {
-        JsonArrayBuilder ret = Json.createArrayBuilder();
-        List<Candidate> candies = _ice.getCandidates();
-        //{"sdpMLineIndex":1,"sdpMid":"data","candidate":{"foundation":"2169522962","component":"1","protocol":"tcp","priority":"1509957375","ip":"192.67.4.33","port":"0","type":"host","generation":"0\r\n"}
-        for (Candidate candy : candies) {
-            ret.add(mkCandidateJson(candy));
-        }
-        return ret;
-    }
+    abstract public JsonArrayBuilder mkCandidates() ;
 
     public JsonObject mkAnswer() {
         return mkSDP("answer", _ice.getDtlsClientRole() ? "active" : "passive");
