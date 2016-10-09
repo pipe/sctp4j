@@ -72,6 +72,8 @@ public abstract class Chunk {
     public final static int COOKIE_ECHO = 10;
     public final static int COOKIE_ACK = 11;
     public final static int SHUTDOWN_COMPLETE = 14;
+    public final static int RE_CONFIG = 130;
+
 
 
     static byte TBIT = 1;
@@ -91,8 +93,8 @@ public abstract class Chunk {
             byte type = pkt.get();
             byte flags = pkt.get();
             int length = pkt.getChar();
-            // at somepoint this may end up being a switch making individual typed subclasses.
-            switch ((int) type) {
+            int itype = (int) (0xff & type);
+            switch (itype) {
                 case DATA:
                     ret = new DataChunk(type, flags, length, pkt);
                     break;
@@ -117,7 +119,11 @@ public abstract class Chunk {
                 case HEARTBEAT:
                     ret = new HeartBeatChunk(type, flags, length, pkt);
                     break;
+                case RE_CONFIG:
+                    ret = new ReConfigChunk(type, flags, length, pkt);
+                    break;
                 default:
+                    Log.warn("Default chunk type "+itype+" read in ");
                     ret = new Chunk(type, flags, length, pkt) {
                         @Override
                         void putFixedParams(ByteBuffer ret) {
@@ -282,7 +288,14 @@ public abstract class Chunk {
         }
         return ret;
     }
-
+    public static String chunksToNames(byte[] fse) {
+        StringBuffer ret = new StringBuffer();
+        for (byte f:fse){
+            ret.append(typeLookup(f));
+            ret.append(" ");
+        }
+        return ret.toString();
+    }
     public String toString() {
         return "Chunk : type " + typeLookup(_type) + " flags " + Integer.toHexString((0xff) & _flags) + " length = " + _length;
     }
@@ -429,7 +442,7 @@ public abstract class Chunk {
         }
         try {
             var.readBody(_body, blen);
-            Log.verb("variable type " + var.getType() + " name " + var.getName());
+            Log.debug("variable type " + var.getType() + " name " + var.getName());
         } catch (SctpPacketFormatException ex) {
             Log.error(ex.getMessage());
         }

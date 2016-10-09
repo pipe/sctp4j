@@ -55,6 +55,14 @@ public class OutgoingSSNResetRequestParameter extends KnownParam {
         super(t, n);
     }
 
+    public long getRespSeqNo() {
+        return respSeqNo;
+    }
+
+    public long getReqSeqNo() {
+        return reqSeqNo;
+    }
+
     public void readBody(ByteBuffer body, int blen) {
         reqSeqNo = Chunk.getUnsignedInt(body);
         respSeqNo = Chunk.getUnsignedInt(body);
@@ -66,13 +74,41 @@ public class OutgoingSSNResetRequestParameter extends KnownParam {
     }
 
     public void writeBody(ByteBuffer body, int blen) {
-        Chunk.putUnsignedInt(body,reqSeqNo);
-        Chunk.putUnsignedInt(body,respSeqNo);
-        Chunk.putUnsignedInt(body,lastTsn);
+        Chunk.putUnsignedInt(body, reqSeqNo);
+        Chunk.putUnsignedInt(body, respSeqNo);
+        Chunk.putUnsignedInt(body, lastTsn);
         if (streams != null) {
             for (int i = 0; i < streams.length; i++) {
                 body.putChar((char) streams[i]);
             }
         }
+    }
+
+    @Override
+    public String toString() {
+        StringBuffer ret = new StringBuffer();
+        ret.append(this.getClass().getSimpleName()).append(" ");
+        ret.append("reqseq:").append(this.reqSeqNo).append(" ");
+        ret.append("respseq:").append(this.respSeqNo).append(" ");
+        ret.append("latsTSN:").append(this.lastTsn).append(" ");
+
+        if (streams != null) {
+            ret.append("streams {");
+            for (int s : streams) {
+                ret.append("" + s);
+            }
+            ret.append("}");
+        } else {
+            ret.append("no streams");
+        }
+        return ret.toString();
+    }
+
+    public long getLastAssignedTSN() {
+        return lastTsn;
+    }
+
+    public int[] getStreams() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
 }

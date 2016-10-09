@@ -19,6 +19,7 @@ package com.ipseorama.sctp.messages.params;
 
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.params.VariableParam;
+import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
 
 /**
@@ -50,18 +51,46 @@ public class IncomingSSNResetRequestParameter extends KnownParam {
     }
 
     public void readBody(ByteBuffer body, int blen) {
+        if (blen < 4){
+            Log.error("Huh ? No body to this "+this.getName());
+            return;
+        }
         reqSeqNo = Chunk.getUnsignedInt(body);
-        this.streams = new int[(blen - 12) / 2];
-        for (int i = 0; i < streams.length; i++) {
-            streams[i] = body.getChar();
+        if (blen > 4) {
+            this.streams = new int[(blen - 4) / 2];
+            for (int i = 0; i < streams.length; i++) {
+                streams[i] = body.getChar();
+            }
+        } else {
+            this.streams = new int[0];
+            Log.warn("No inbound stream mentioned");
         }
     }
+
     public void writeBody(ByteBuffer body, int blen) {
-        Chunk.putUnsignedInt(body,reqSeqNo);
+        Chunk.putUnsignedInt(body, reqSeqNo);
         if (streams != null) {
             for (int i = 0; i < streams.length; i++) {
                 body.putChar((char) streams[i]);
             }
         }
     }
+    
+    @Override
+    public String toString(){
+        StringBuffer ret = new StringBuffer();
+        ret.append(this.getClass().getSimpleName()).append(" ");
+        ret.append("seq:"+this.reqSeqNo);
+        if (streams != null){
+            ret.append("streams {");
+            for (int s:streams){
+                ret.append(""+s);
+            }
+            ret.append("}");
+        } else {
+            ret.append("no streams");
+        }
+        return ret.toString();
+    }
+    
 }

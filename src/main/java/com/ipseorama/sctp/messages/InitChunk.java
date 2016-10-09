@@ -91,7 +91,8 @@ public class InitChunk extends Chunk {
                 + " numOutStreams : " + _numOutStreams
                 + " numInStreams : " + _numInStreams
                 + " initialTSN : " + _initialTSN
-                + " farForwardTSNsupported : "+_farForwardTSNsupported;
+                + " farForwardTSNsupported : "+_farForwardTSNsupported
+                + ((_farSupportedExtensions == null) ?" no supported extensions": " supported extensions are: "+chunksToNames(_farSupportedExtensions));
         return ret;
     }
 
@@ -139,4 +140,6 @@ public class InitChunk extends Chunk {
     public void setInitiate(long tag) {
         this._initiateTag = tag;
     }
+
+
 }

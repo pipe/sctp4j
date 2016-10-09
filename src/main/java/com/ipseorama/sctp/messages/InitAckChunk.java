@@ -146,7 +146,9 @@ public class InitAckChunk extends Chunk {
                 + " adRecWinCredit : " + _adRecWinCredit
                 + " numOutStreams : " + _numOutStreams
                 + " numInStreams : " + _numInStreams
-                + " initialTSN : " + _initialTSN;//+ " farForwardTSNsupported : "+_farForwardTSNsupported;
+                + " initialTSN : " + _initialTSN
+                + ((_supportedExtensions == null) ? " no supported extensions" : " supported extensions are: " + chunksToNames(_supportedExtensions));
+        ;
         return ret;
     }
 

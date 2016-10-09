@@ -23,6 +23,9 @@ import com.ipseorama.base.dataChannel.DECP.DCOpen;
 import com.ipseorama.sctp.messages.*;
 
 import com.ipseorama.sctp.messages.exceptions.*;
+import com.ipseorama.sctp.messages.params.IncomingSSNResetRequestParameter;
+import com.ipseorama.sctp.messages.params.OutgoingSSNResetRequestParameter;
+import com.ipseorama.sctp.messages.params.ReconfigurationResponseParameter;
 import com.ipseorama.sctp.messages.params.StaleCookieError;
 import com.ipseorama.sctp.small.BlockingSCTPStream;
 
@@ -37,6 +40,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 
@@ -47,6 +51,7 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
 abstract public class Association {
 
     public abstract void associate() throws SctpPacketFormatException, IOException;
+
 
     /**
      * <code>
@@ -94,7 +99,7 @@ abstract public class Association {
         SHUTDOWNACKSENT, CLOSED
     };
 
-    private byte[] _supportedExtensions = {};
+    private byte[] _supportedExtensions = {(byte) Chunk.RE_CONFIG};
     /*
      For what it is worth, here's the logic as to why we don't have any supported extensions.
      { 
@@ -160,14 +165,19 @@ abstract public class Association {
     byte[] getUnionSupportedExtensions(byte far[]) {
         ByteBuffer unionbb = ByteBuffer.allocate(far.length);
         for (int f = 0; f < far.length; f++) {
+            Log.verb("offered extension " + Chunk.typeLookup(far[f]));
             for (int n = 0; n < _supportedExtensions.length; n++) {
+                Log.verb("supported extension " + Chunk.typeLookup(_supportedExtensions[n]));
                 if (_supportedExtensions[n] == far[f]) {
+                    Log.verb("matching extension " + Chunk.typeLookup(_supportedExtensions[n]));
                     unionbb.put(far[f]);
                 }
             }
         }
         byte[] res = new byte[unionbb.position()];
+        unionbb.rewind();
         unionbb.get(res);
+        Log.verb("union of extensions contains :" + Chunk.chunksToNames(res));
         return res;
     }
 
@@ -190,13 +200,19 @@ abstract public class Association {
             }
         }
         // find the highest sack.
-        Optional<Chunk> hisack = replies.stream().filter((Chunk c) -> { return c.getType() == Chunk.SACK; })
-                .sorted((Chunk a, Chunk b) -> { return (int) (((SackChunk)b).getCumuTSNAck() - ((SackChunk)a).getCumuTSNAck());})
+        Optional<Chunk> hisack = replies.stream().filter((Chunk c) -> {
+            return c.getType() == Chunk.SACK;
+        })
+                .sorted((Chunk a, Chunk b) -> {
+                    return (int) (((SackChunk) b).getCumuTSNAck() - ((SackChunk) a).getCumuTSNAck());
+                })
                 .findFirst();
         // remove all sacks
-        replies.removeIf((Chunk c) -> { return c.getType() == Chunk.SACK; });
+        replies.removeIf((Chunk c) -> {
+            return c.getType() == Chunk.SACK;
+        });
         // insert the higest one first.
-        if (hisack.isPresent()){
+        if (hisack.isPresent()) {
             replies.add(0, hisack.get());
         }
         try {
@@ -350,7 +366,7 @@ abstract public class Association {
                 break;
             case Chunk.DATA:
                 Log.debug("got data " + c.toString());
-                reply = dataDeal ((DataChunk) c);
+                reply = dataDeal((DataChunk) c);
                 break;
             case Chunk.ABORT:
                 // no reply we should just bail I think.
@@ -364,6 +380,9 @@ abstract public class Association {
                 Log.debug("got tsak for TSN " + ((SackChunk) c).getCumuTSNAck());
                 reply = sackDeal((SackChunk) c);
                 // fix the outbound list here
+                break;
+            case Chunk.RE_CONFIG:
+                reply = reconfigDeal((ReConfigChunk) c);
                 break;
         }
         if (reply != null) {
@@ -567,6 +586,8 @@ abstract public class Association {
         }
         reply = new Chunk[1];
         reply[0] = iac;
+        Log.debug("Got in bound init :" + init.toString());
+        Log.debug("Replying with init-ack :" + iac.toString());
         return reply;
     }
 
@@ -781,6 +802,94 @@ abstract public class Association {
 
     public abstract SCTPStream mkStream(int id);
 
+    class ReconfigState {
+
+        private boolean haveSeen(ReConfigChunk rconf) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        private ReConfigChunk getPrevious(ReConfigChunk rconf) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        private boolean timerIsRunning(ReConfigChunk rconf) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+        private void markAsAcked(ReConfigChunk rconf) {
+            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        }
+
+    };
+    ReconfigState reconfigState;
+
+    /*
+     * https://tools.ietf.org/html/rfc6525
+     */
+    private Chunk[] reconfigDeal(ReConfigChunk rconf) {
+        Chunk[] ret = new Chunk[1];
+        ReConfigChunk reply = null;
+        if (reconfigState == null) { // is this the first ever reconf?
+            reconfigState = new ReconfigState();
+        } else if (reconfigState.haveSeen(rconf)) { // if not - is this a repeat
+            reply = reconfigState.getPrevious(rconf); // then send the same reply
+        }
+        if (reply == null) { // not a repeat then
+            reply = new ReConfigChunk(); // create a new thing 
+            if (rconf.hasOutgoingReset()) {
+                OutgoingSSNResetRequestParameter oreset = rconf.getOutgoingReset();
+                int[] streams = oreset.getStreams();
+                if (streams.length == 0) {
+                    streams = allStreams();
+                }
+                if (reconfigState.timerIsRunning(rconf)) {
+                    reconfigState.markAsAcked(rconf);
+                }
+                // if we are behind, we are supposed to wait untill we catch up.
+                if (oreset.getLastAssignedTSN() > this.getCumAckPt()) {
+                    Log.debug("Last assigned > farTSN "+oreset.getLastAssignedTSN() +" v " + this.getCumAckPt());
+                    for (int s : streams) {
+                        SCTPStream defstr = _streams.get(new Integer(s));
+                        defstr.setDeferred(true);
+                    }
+                    ReconfigurationResponseParameter rep = new ReconfigurationResponseParameter();
+                    rep.setSeq(oreset.getReqSeqNo());
+                    rep.setResult(rep.IN_PROGRESS);
+                    reply.addParam(rep);
+                } else {
+                    Log.debug("we are up-to-date ");
+                    for (int s : streams) {
+                        Integer si = new Integer(s);
+                        SCTPStream cstrm = _streams.remove(si);
+                        if (cstrm == null){
+                            Log.error("Close a non existant stream");
+                            // bidriectional might be a problem here...
+                        } else {
+                            cstrm.reset();
+                        }
+                        
+                        
+                    }
+                    
+
+                }
+            }
+            if (rconf.hasIncomingReset()) {
+                IncomingSSNResetRequestParameter ireset = rconf.getIncomingReset();
+                Log.debug("Ireset " + ireset);
+            }
+        }
+        if (reply.hasParam()) {
+            ret[0] = reply;
+        } else {
+            ret = null;
+        }
+        return ret;
+    }
+    private long getCumAckPt() {
+        return _farTSN;
+    }
+
     public SCTPStream mkStream(String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
         int n = 1;
         int tries = this._maxOutStreams;
@@ -791,6 +900,16 @@ abstract public class Association {
             }
         } while (_streams.containsKey(new Integer(n)));
         return mkStream(n, label);
+    }
+
+    private int[] allStreams() {
+        Set<Integer> ks = _streams.keySet();
+        int[] ret = new int[ks.size()];
+        int i = 0;
+        for (Integer k : ks) {
+            ret[i++] = k;
+        }
+        return ret;
     }
 
     public SCTPStream mkStream(int sno, String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {

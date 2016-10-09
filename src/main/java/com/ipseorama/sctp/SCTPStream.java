@@ -137,4 +137,12 @@ public abstract class SCTPStream {
     }
 
     abstract public void deliverMessage(SCTPMessage message); 
+
+    void setDeferred(boolean b) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    void reset() {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
 }
