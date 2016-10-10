@@ -70,7 +70,7 @@ public abstract class PermittedEndpointMaker implements PermittedAssociationList
                         break;
                     case "shell":
                         //if (_certMaker.isMaster(_farFinger)) {
-                            sl = new ShellEndpoint(s);
+                        sl = new ShellEndpoint(s);
                         //} else {
                         //    sl = new ErrorEndpoint(s);
                         //}
@@ -121,6 +121,10 @@ public abstract class PermittedEndpointMaker implements PermittedAssociationList
                 s.close();
             }
 
+            @Override
+            public void close(SCTPStream aThis) {
+                Log.debug("Closed an adhoc stream");
+            }
         };
         return ret;
     }

@@ -46,6 +46,9 @@ public abstract class JsonEndpoint implements SCTPStreamListener , JsonFace{
             ex.printStackTrace();
         }
     }
-
+    @Override
+    public void close(SCTPStream aThis) {
+        Log.debug("Closed an json stream");
+    }
 
 }

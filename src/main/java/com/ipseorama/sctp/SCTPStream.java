@@ -139,10 +139,18 @@ public abstract class SCTPStream {
     abstract public void deliverMessage(SCTPMessage message); 
 
     void setDeferred(boolean b) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        boolean deferred = true;
     }
 
     void reset() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+
+        Log.debug("Resetting stream "+this._sno);
+        if (this._sl != null){
+            _sl.close(this);
+        }
+    }
+
+    void setClosing(boolean b) {
+        boolean closing = b;
     }
 }

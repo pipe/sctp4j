@@ -25,4 +25,6 @@ package com.ipseorama.sctp;
 public interface SCTPStreamListener {
     public void onMessage(SCTPStream s, String message);
 
+    public void close(SCTPStream aThis);
+
 }

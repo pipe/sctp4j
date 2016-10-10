@@ -255,7 +255,7 @@ public abstract class Chunk {
         int pad = 0;
         if (_varList != null) {
             for (VariableParam v : this._varList) {
-                Log.verb("var " + v.getName() + " at " + ret.position());
+                Log.debug("var " + v.getName() + " at " + ret.position());
 
                 ByteBuffer var = ret.slice();
                 var.putChar((char) v.getType());

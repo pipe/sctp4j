@@ -118,10 +118,10 @@ public class ReConfigChunk extends Chunk {
     @Override
     public void validate() {
         if (_varList.size() < 1) {
-            throw new IllegalArgumentException("Too few params "+_varList.size());
+            throw new IllegalArgumentException("Too few params " + _varList.size());
         }
         if (_varList.size() > 2) {
-            throw new IllegalArgumentException("Too many params "+_varList.size());
+            throw new IllegalArgumentException("Too many params " + _varList.size());
         }
         // now check for invalid combos
         if ((_varList.size() == 2)) {
@@ -160,8 +160,32 @@ public class ReConfigChunk extends Chunk {
     }
 
     public void addParam(VariableParam rep) {
+        Log.debug("adding "+rep+" to "+this);
         _varList.add(rep);
         validate();
+    }
+
+    public boolean sameAs(ReConfigChunk other) {
+        // we ignore other var types for now....
+        boolean ret = false; // assume the negative.
+        if (other != null) {
+            // if there are 2 params and both match
+            if ((this.hasIncomingReset() && other.hasIncomingReset())
+                    && (this.hasOutgoingReset() && other.hasOutgoingReset())) {
+                ret = this.getIncomingReset().sameAs(other.getIncomingReset())
+                        && this.getOutgoingReset().sameAs(other.getOutgoingReset());
+            } else {
+                // there is only one (of these) params
+                // that has to match too
+                if (this.hasIncomingReset() && other.hasIncomingReset()) {
+                    ret = this.getIncomingReset().sameAs(other.getIncomingReset());
+                }
+                if (this.hasOutgoingReset() && other.hasOutgoingReset()) {
+                    ret = this.getOutgoingReset().sameAs(other.getOutgoingReset());
+                }
+            }
+        }
+        return ret;
     }
 
 

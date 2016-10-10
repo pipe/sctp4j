@@ -41,5 +41,9 @@ public class TickEndpoint implements SCTPStreamListener {
     public void onMessage(SCTPStream s, String message) {
         Log.debug("Ignoring "+message);
     }
-    
+    @Override
+    public void close(SCTPStream aThis) {
+        ticker.cancel();
+        Log.debug("Closed an echo stream");
+    }
 }

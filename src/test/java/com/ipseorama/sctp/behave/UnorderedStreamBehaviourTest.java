@@ -96,6 +96,10 @@ public class UnorderedStreamBehaviourTest {
             assert (_results.remove(message));
         }
 
+        @Override
+        public void close(SCTPStream aThis) {
+        }
+
     };
 
     @org.junit.Test

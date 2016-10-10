@@ -29,4 +29,9 @@ public class EchoEndpoint implements SCTPStreamListener {
         }
     }
 
+    @Override
+    public void close(SCTPStream aThis) {
+        Log.debug("Closed an echo stream");
+    }
+
 }

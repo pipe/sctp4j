@@ -85,6 +85,7 @@ public class ReconfigurationResponseParameter extends KnownParam {
         this(16, "ReconfigurationResponseParameter");
     }
 
+    @Override
     public void readBody(ByteBuffer body, int blen) {
         this.seqNo = Chunk.getUnsignedInt(body);
         this.result = Chunk.getUnsignedInt(body);
@@ -95,7 +96,8 @@ public class ReconfigurationResponseParameter extends KnownParam {
         }
     }
 
-    public void writeBody(ByteBuffer body, int blen) {
+    @Override
+    public void writeBody(ByteBuffer body) {
         Chunk.putUnsignedInt(body, seqNo);
         Chunk.putUnsignedInt(body, result);
         if (hasTSNs) {

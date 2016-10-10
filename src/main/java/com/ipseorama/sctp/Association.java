@@ -41,7 +41,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Stream;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 
 /**
@@ -51,7 +50,6 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
 abstract public class Association {
 
     public abstract void associate() throws SctpPacketFormatException, IOException;
-
 
     /**
      * <code>
@@ -158,7 +156,7 @@ abstract public class Association {
     };
     private final ArrayList<CookieHolder> _cookies = new ArrayList();
 
-    byte[] getSupportedExtensions() {
+    protected byte[] getSupportedExtensions() { // this lets others swithc features off.
         return _supportedExtensions;
     }
 
@@ -330,6 +328,12 @@ abstract public class Association {
      */
     private boolean deal(Chunk c, ArrayList<Chunk> replies) throws IOException, SctpPacketFormatException {
         int ty = c.getType();
+        if (ty < 0){
+            // todo this is the wrong place to do this....
+            Log.debug("fixing negative "+ty);
+            ty = (ty & 0x7f) +128;
+            Log.debug("fixed negative "+ty);
+        }
         boolean ret = true;
         State oldState = _state;
         Chunk[] reply = null;
@@ -803,21 +807,40 @@ abstract public class Association {
     public abstract SCTPStream mkStream(int id);
 
     class ReconfigState {
+        
+        ReConfigChunk recentInbound = null;
+        ReConfigChunk sentReply = null;
+        boolean timerRunning = false;
+        Association ass ;
+        long seqno = 0; 
+
+        private ReconfigState(Association a) {
+            ass = a;
+        }
 
         private boolean haveSeen(ReConfigChunk rconf) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            return rconf.sameAs(recentInbound);
         }
 
         private ReConfigChunk getPrevious(ReConfigChunk rconf) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            return rconf.sameAs(recentInbound) ? sentReply : null;
         }
 
         private boolean timerIsRunning(ReConfigChunk rconf) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            return timerRunning;
         }
 
         private void markAsAcked(ReConfigChunk rconf) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            // ooh, what does this button do ??? To Do
+        }
+
+        private long nextNo() {
+            if (seqno == 0){
+                seqno = ass._nearTSN;
+            } else {
+                seqno++;
+            }
+            return seqno;
         }
 
     };
@@ -829,13 +852,31 @@ abstract public class Association {
     private Chunk[] reconfigDeal(ReConfigChunk rconf) {
         Chunk[] ret = new Chunk[1];
         ReConfigChunk reply = null;
+        Log.debug("Got a reconfig message to deal with");
         if (reconfigState == null) { // is this the first ever reconf?
-            reconfigState = new ReconfigState();
+            reconfigState = new ReconfigState(this);
         } else if (reconfigState.haveSeen(rconf)) { // if not - is this a repeat
             reply = reconfigState.getPrevious(rconf); // then send the same reply
         }
         if (reply == null) { // not a repeat then
             reply = new ReConfigChunk(); // create a new thing 
+            if (rconf.hasIncomingReset()) {
+                IncomingSSNResetRequestParameter ireset = rconf.getIncomingReset();
+                OutgoingSSNResetRequestParameter rep = new OutgoingSSNResetRequestParameter(ireset,reconfigState.nextNo(),_nearTSN-1);
+                int[] streams = ireset.getStreams();
+                rep.setStreams(streams);
+                if (streams.length == 0) {
+                    streams = allStreams();
+                }
+                for (int s : streams) {
+                    SCTPStream st = _streams.get(new Integer(s));
+                    if (st!= null) {
+                        st.setClosing(true);
+                    }
+                }
+                reply.addParam(rep);
+                Log.debug("Ireset " + ireset);
+            }
             if (rconf.hasOutgoingReset()) {
                 OutgoingSSNResetRequestParameter oreset = rconf.getOutgoingReset();
                 int[] streams = oreset.getStreams();
@@ -847,7 +888,7 @@ abstract public class Association {
                 }
                 // if we are behind, we are supposed to wait untill we catch up.
                 if (oreset.getLastAssignedTSN() > this.getCumAckPt()) {
-                    Log.debug("Last assigned > farTSN "+oreset.getLastAssignedTSN() +" v " + this.getCumAckPt());
+                    Log.debug("Last assigned > farTSN " + oreset.getLastAssignedTSN() + " v " + this.getCumAckPt());
                     for (int s : streams) {
                         SCTPStream defstr = _streams.get(new Integer(s));
                         defstr.setDeferred(true);
@@ -857,35 +898,39 @@ abstract public class Association {
                     rep.setResult(rep.IN_PROGRESS);
                     reply.addParam(rep);
                 } else {
+                    // somehow invoke this when TSN catches up ?!?! ToDo
                     Log.debug("we are up-to-date ");
+                    ReconfigurationResponseParameter rep = new ReconfigurationResponseParameter();
+                    rep.setSeq(oreset.getReqSeqNo());
+                    int result = streams.length > 0 ? rep.SUCCESS_PERFORMED : rep.SUCCESS_NOTHING_TO_DO;
+                    rep.setResult(result); // assume all good
                     for (int s : streams) {
                         Integer si = new Integer(s);
                         SCTPStream cstrm = _streams.remove(si);
-                        if (cstrm == null){
+                        if (cstrm == null) {
                             Log.error("Close a non existant stream");
+                            rep.setResult(rep.ERROR_WRONG_SSN);
+                            break;
                             // bidriectional might be a problem here...
                         } else {
                             cstrm.reset();
                         }
-                        
-                        
                     }
-                    
-
+                    reply.addParam(rep);
                 }
             }
-            if (rconf.hasIncomingReset()) {
-                IncomingSSNResetRequestParameter ireset = rconf.getIncomingReset();
-                Log.debug("Ireset " + ireset);
-            }
+
         }
         if (reply.hasParam()) {
             ret[0] = reply;
+            // todo should add sack here
+            Log.debug("about to reply with "+reply.toString());
         } else {
             ret = null;
         }
         return ret;
     }
+
     private long getCumAckPt() {
         return _farTSN;
     }

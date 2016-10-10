@@ -27,6 +27,8 @@ import java.nio.ByteBuffer;
  */
 public class OutgoingSSNResetRequestParameter extends KnownParam {
 
+    
+
     /*
      0                   1                   2                   3
      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -54,6 +56,15 @@ public class OutgoingSSNResetRequestParameter extends KnownParam {
     public OutgoingSSNResetRequestParameter(int t, String n) {
         super(t, n);
     }
+    public OutgoingSSNResetRequestParameter() {
+          super(13, "OutgoingSSNResetRequestParameter");
+    }
+    public OutgoingSSNResetRequestParameter(IncomingSSNResetRequestParameter ireset,long reqNo, long lastTsn) {
+        this();
+        this.respSeqNo = ireset.reqSeqNo;
+        this.lastTsn = lastTsn;
+        this.reqSeqNo = reqNo;
+    }
 
     public long getRespSeqNo() {
         return respSeqNo;
@@ -63,6 +74,7 @@ public class OutgoingSSNResetRequestParameter extends KnownParam {
         return reqSeqNo;
     }
 
+    @Override
     public void readBody(ByteBuffer body, int blen) {
         reqSeqNo = Chunk.getUnsignedInt(body);
         respSeqNo = Chunk.getUnsignedInt(body);
@@ -73,7 +85,8 @@ public class OutgoingSSNResetRequestParameter extends KnownParam {
         }
     }
 
-    public void writeBody(ByteBuffer body, int blen) {
+    @Override
+    public void writeBody(ByteBuffer body) {
         Chunk.putUnsignedInt(body, reqSeqNo);
         Chunk.putUnsignedInt(body, respSeqNo);
         Chunk.putUnsignedInt(body, lastTsn);
@@ -109,6 +122,13 @@ public class OutgoingSSNResetRequestParameter extends KnownParam {
     }
 
     public int[] getStreams() {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+        return streams;
+    }
+    public void setStreams(int[] ss) {
+        this.streams =ss;
+    }
+
+    public boolean sameAs(OutgoingSSNResetRequestParameter other) {
+        return this.reqSeqNo == other.reqSeqNo;
     }
 }

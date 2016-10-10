@@ -50,6 +50,7 @@ public class IncomingSSNResetRequestParameter extends KnownParam {
         super(t, n);
     }
 
+    @Override
     public void readBody(ByteBuffer body, int blen) {
         if (blen < 4){
             Log.error("Huh ? No body to this "+this.getName());
@@ -67,7 +68,8 @@ public class IncomingSSNResetRequestParameter extends KnownParam {
         }
     }
 
-    public void writeBody(ByteBuffer body, int blen) {
+    @Override
+    public void writeBody(ByteBuffer body) {
         Chunk.putUnsignedInt(body, reqSeqNo);
         if (streams != null) {
             for (int i = 0; i < streams.length; i++) {
@@ -91,6 +93,13 @@ public class IncomingSSNResetRequestParameter extends KnownParam {
             ret.append("no streams");
         }
         return ret.toString();
+    }
+
+    public boolean sameAs(IncomingSSNResetRequestParameter other) {
+        return this.reqSeqNo == other.reqSeqNo;
+    }
+    public int [] getStreams(){
+        return streams;
     }
     
 }

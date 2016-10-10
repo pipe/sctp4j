@@ -81,6 +81,11 @@ public class OrderedStreamBehaviourTest {
             assert (_results.remove(message));
         }
 
+        @Override
+        public void close(SCTPStream aThis) {
+            Log.verb("close '");
+        }
+
     };
 
     SCTPStream mockStream() {
