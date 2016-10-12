@@ -271,6 +271,7 @@ abstract public class Association {
         _outbound = new HashMap<Long, DataChunk>();
         _holdingPen = new HashMap<Long, DataChunk>();
         _nearTSN = _random.nextInt(Integer.MAX_VALUE);
+        reconfigState = new ReconfigState(_nearTSN);
         _state = State.CLOSED;
         if (_transp != null) {
             startRcv();
@@ -811,11 +812,10 @@ abstract public class Association {
         ReConfigChunk recentInbound = null;
         ReConfigChunk sentReply = null;
         boolean timerRunning = false;
-        Association ass ;
         long seqno = 0; 
 
-        private ReconfigState(Association a) {
-            ass = a;
+        private ReconfigState(long initialTSN) {
+            seqno = initialTSN;
         }
 
         private boolean haveSeen(ReConfigChunk rconf) {
@@ -835,12 +835,7 @@ abstract public class Association {
         }
 
         private long nextNo() {
-            if (seqno == 0){
-                seqno = ass._nearTSN;
-            } else {
-                seqno++;
-            }
-            return seqno;
+            return seqno++;
         }
 
     };
@@ -853,9 +848,7 @@ abstract public class Association {
         Chunk[] ret = new Chunk[1];
         ReConfigChunk reply = null;
         Log.debug("Got a reconfig message to deal with");
-        if (reconfigState == null) { // is this the first ever reconf?
-            reconfigState = new ReconfigState(this);
-        } else if (reconfigState.haveSeen(rconf)) { // if not - is this a repeat
+        if (reconfigState.haveSeen(rconf)) { // if not - is this a repeat
             reply = reconfigState.getPrevious(rconf); // then send the same reply
         }
         if (reply == null) { // not a repeat then
