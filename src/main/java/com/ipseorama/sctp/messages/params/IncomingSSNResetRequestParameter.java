@@ -101,5 +101,9 @@ public class IncomingSSNResetRequestParameter extends KnownParam {
     public int [] getStreams(){
         return streams;
     }
+
+    public long getReqNo() {
+        return this.reqSeqNo;
+    }
     
 }

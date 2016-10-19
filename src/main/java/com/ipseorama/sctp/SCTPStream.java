@@ -21,7 +21,9 @@ import com.ipseorama.sctp.behave.OrderedStreamBehaviour;
 import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
+import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
 import com.phono.srtplight.Log;
+import java.io.IOException;
 import java.util.TreeSet;
 
 /**
@@ -116,8 +118,8 @@ public abstract class SCTPStream {
         return _ass;
     }
 
-    public void close() {
-        Log.debug("close() Not supported yet.");
+    public void close() throws Exception {
+        _ass.closeStream(this._sno);
     }
 
     public void setNextMessageSeqIn(int expectedSeq) {

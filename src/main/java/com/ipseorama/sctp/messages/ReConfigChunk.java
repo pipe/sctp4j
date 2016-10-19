@@ -13,13 +13,15 @@ import com.ipseorama.sctp.messages.params.ReconfigurationResponseParameter;
 import com.ipseorama.sctp.messages.params.VariableParam;
 import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
-import java.util.Optional;
 
 /**
  *
  * @author thp
  */
 public class ReConfigChunk extends Chunk {
+
+    private long sentAt;
+    private int retries;
 
     public ReConfigChunk(byte type, byte flags, int length, ByteBuffer pkt) {
         super(type, flags, length, pkt);
@@ -187,6 +189,15 @@ public class ReConfigChunk extends Chunk {
         }
         return ret;
     }
-
+// stuff to manage outbound retries
+    public long getSentTime(){
+        return sentAt;
+    }
+    public void setSentTime(long now){
+        sentAt = now;
+    }
+    public int getAndIncrementRetryCount(){
+        return retries++;
+    }
 
 }

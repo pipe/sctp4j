@@ -23,9 +23,6 @@ import com.ipseorama.base.dataChannel.DECP.DCOpen;
 import com.ipseorama.sctp.messages.*;
 
 import com.ipseorama.sctp.messages.exceptions.*;
-import com.ipseorama.sctp.messages.params.IncomingSSNResetRequestParameter;
-import com.ipseorama.sctp.messages.params.OutgoingSSNResetRequestParameter;
-import com.ipseorama.sctp.messages.params.ReconfigurationResponseParameter;
 import com.ipseorama.sctp.messages.params.StaleCookieError;
 import com.ipseorama.sctp.small.BlockingSCTPStream;
 
@@ -50,6 +47,10 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
 abstract public class Association {
 
     public abstract void associate() throws SctpPacketFormatException, IOException;
+
+
+
+
 
     /**
      * <code>
@@ -146,6 +147,7 @@ abstract public class Association {
     private HashMap<Long, DataChunk> _holdingPen;
     private static int TICK = 1000; // loop time in rcv
     static int __assocNo = 1;
+    private ReconfigState reconfigState;
 
     ;
 
@@ -159,7 +161,9 @@ abstract public class Association {
     protected byte[] getSupportedExtensions() { // this lets others swithc features off.
         return _supportedExtensions;
     }
-
+    long getNearTSN() {
+        return _nearTSN;
+    }
     byte[] getUnionSupportedExtensions(byte far[]) {
         ByteBuffer unionbb = ByteBuffer.allocate(far.length);
         for (int f = 0; f < far.length; f++) {
@@ -271,7 +275,6 @@ abstract public class Association {
         _outbound = new HashMap<Long, DataChunk>();
         _holdingPen = new HashMap<Long, DataChunk>();
         _nearTSN = _random.nextInt(Integer.MAX_VALUE);
-        reconfigState = new ReconfigState(_nearTSN);
         _state = State.CLOSED;
         if (_transp != null) {
             startRcv();
@@ -329,11 +332,11 @@ abstract public class Association {
      */
     private boolean deal(Chunk c, ArrayList<Chunk> replies) throws IOException, SctpPacketFormatException {
         int ty = c.getType();
-        if (ty < 0){
+        if (ty < 0) {
             // todo this is the wrong place to do this....
-            Log.debug("fixing negative "+ty);
-            ty = (ty & 0x7f) +128;
-            Log.debug("fixed negative "+ty);
+            Log.debug("fixing negative " + ty);
+            ty = (ty & 0x7f) + 128;
+            Log.debug("fixed negative " + ty);
         }
         boolean ret = true;
         State oldState = _state;
@@ -387,7 +390,7 @@ abstract public class Association {
                 // fix the outbound list here
                 break;
             case Chunk.RE_CONFIG:
-                reply = reconfigDeal((ReConfigChunk) c);
+                reply = reconfigState.deal((ReConfigChunk) c);
                 break;
         }
         if (reply != null) {
@@ -402,6 +405,8 @@ abstract public class Association {
             if (null != _al) {
                 _al.onAssociated(this);
             }
+            reconfigState = new ReconfigState(this,_farTSN);
+
         }
         if ((oldState == State.ESTABLISHED) && (_state != State.ESTABLISHED)) {
             if (null != _al) {
@@ -807,127 +812,20 @@ abstract public class Association {
 
     public abstract SCTPStream mkStream(int id);
 
-    class ReconfigState {
-        
-        ReConfigChunk recentInbound = null;
-        ReConfigChunk sentReply = null;
-        boolean timerRunning = false;
-        long seqno = 0; 
 
-        private ReconfigState(long initialTSN) {
-            seqno = initialTSN;
-        }
-
-        private boolean haveSeen(ReConfigChunk rconf) {
-            return rconf.sameAs(recentInbound);
-        }
-
-        private ReConfigChunk getPrevious(ReConfigChunk rconf) {
-            return rconf.sameAs(recentInbound) ? sentReply : null;
-        }
-
-        private boolean timerIsRunning(ReConfigChunk rconf) {
-            return timerRunning;
-        }
-
-        private void markAsAcked(ReConfigChunk rconf) {
-            // ooh, what does this button do ??? To Do
-        }
-
-        private long nextNo() {
-            return seqno++;
-        }
-
-    };
-    ReconfigState reconfigState;
-
-    /*
-     * https://tools.ietf.org/html/rfc6525
-     */
-    private Chunk[] reconfigDeal(ReConfigChunk rconf) {
-        Chunk[] ret = new Chunk[1];
-        ReConfigChunk reply = null;
-        Log.debug("Got a reconfig message to deal with");
-        if (reconfigState.haveSeen(rconf)) { // if not - is this a repeat
-            reply = reconfigState.getPrevious(rconf); // then send the same reply
-        }
-        if (reply == null) { // not a repeat then
-            reply = new ReConfigChunk(); // create a new thing 
-            if (rconf.hasIncomingReset()) {
-                IncomingSSNResetRequestParameter ireset = rconf.getIncomingReset();
-                OutgoingSSNResetRequestParameter rep = new OutgoingSSNResetRequestParameter(ireset,reconfigState.nextNo(),_nearTSN-1);
-                int[] streams = ireset.getStreams();
-                rep.setStreams(streams);
-                if (streams.length == 0) {
-                    streams = allStreams();
-                }
-                for (int s : streams) {
-                    SCTPStream st = _streams.get(new Integer(s));
-                    if (st!= null) {
-                        st.setClosing(true);
-                    }
-                }
-                reply.addParam(rep);
-                Log.debug("Ireset " + ireset);
-            }
-            if (rconf.hasOutgoingReset()) {
-                OutgoingSSNResetRequestParameter oreset = rconf.getOutgoingReset();
-                int[] streams = oreset.getStreams();
-                if (streams.length == 0) {
-                    streams = allStreams();
-                }
-                if (reconfigState.timerIsRunning(rconf)) {
-                    reconfigState.markAsAcked(rconf);
-                }
-                // if we are behind, we are supposed to wait untill we catch up.
-                if (oreset.getLastAssignedTSN() > this.getCumAckPt()) {
-                    Log.debug("Last assigned > farTSN " + oreset.getLastAssignedTSN() + " v " + this.getCumAckPt());
-                    for (int s : streams) {
-                        SCTPStream defstr = _streams.get(new Integer(s));
-                        defstr.setDeferred(true);
-                    }
-                    ReconfigurationResponseParameter rep = new ReconfigurationResponseParameter();
-                    rep.setSeq(oreset.getReqSeqNo());
-                    rep.setResult(rep.IN_PROGRESS);
-                    reply.addParam(rep);
-                } else {
-                    // somehow invoke this when TSN catches up ?!?! ToDo
-                    Log.debug("we are up-to-date ");
-                    ReconfigurationResponseParameter rep = new ReconfigurationResponseParameter();
-                    rep.setSeq(oreset.getReqSeqNo());
-                    int result = streams.length > 0 ? rep.SUCCESS_PERFORMED : rep.SUCCESS_NOTHING_TO_DO;
-                    rep.setResult(result); // assume all good
-                    for (int s : streams) {
-                        Integer si = new Integer(s);
-                        SCTPStream cstrm = _streams.remove(si);
-                        if (cstrm == null) {
-                            Log.error("Close a non existant stream");
-                            rep.setResult(rep.ERROR_WRONG_SSN);
-                            break;
-                            // bidriectional might be a problem here...
-                        } else {
-                            cstrm.reset();
-                        }
-                    }
-                    reply.addParam(rep);
-                }
-            }
-
-        }
-        if (reply.hasParam()) {
-            ret[0] = reply;
-            // todo should add sack here
-            Log.debug("about to reply with "+reply.toString());
-        } else {
-            ret = null;
-        }
-        return ret;
-    }
-
-    private long getCumAckPt() {
+    long getCumAckPt() {
         return _farTSN;
     }
 
+    public void closeStream(Integer id) throws SctpPacketFormatException, IOException, Exception{
+        Chunk []cs = new Chunk[1];
+        if (canSend()){
+            cs[0] = reconfigState.makeClose(id);
+        }
+        this.send(cs);
+    }
+
+    
     public SCTPStream mkStream(String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
         int n = 1;
         int tries = this._maxOutStreams;
@@ -940,7 +838,7 @@ abstract public class Association {
         return mkStream(n, label);
     }
 
-    private int[] allStreams() {
+    int[] allStreams() {
         Set<Integer> ks = _streams.keySet();
         int[] ret = new int[ks.size()];
         int i = 0;
@@ -949,7 +847,14 @@ abstract public class Association {
         }
         return ret;
     }
+    SCTPStream getStream(int s) {
+        return _streams.get(s);
+    }
 
+    SCTPStream delStream(int s) {
+        return _streams.remove(s);
+    }
+    
     public SCTPStream mkStream(int sno, String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
         SCTPStream sout;
         if (canSend()) {

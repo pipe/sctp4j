@@ -59,9 +59,9 @@ public class OutgoingSSNResetRequestParameter extends KnownParam {
     public OutgoingSSNResetRequestParameter() {
           super(13, "OutgoingSSNResetRequestParameter");
     }
-    public OutgoingSSNResetRequestParameter(IncomingSSNResetRequestParameter ireset,long reqNo, long lastTsn) {
+    public OutgoingSSNResetRequestParameter(long reqNo,long respNo, long lastTsn) {
         this();
-        this.respSeqNo = ireset.reqSeqNo;
+        this.respSeqNo = respNo;
         this.lastTsn = lastTsn;
         this.reqSeqNo = reqNo;
     }

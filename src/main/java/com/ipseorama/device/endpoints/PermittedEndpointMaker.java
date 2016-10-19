@@ -11,6 +11,8 @@ import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.SCTPStream;
 import com.ipseorama.sctp.SCTPStreamListener;
 import com.phono.srtplight.Log;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.bouncycastle.asn1.x509.Certificate;
 
 /**
@@ -85,7 +87,11 @@ public abstract class PermittedEndpointMaker implements PermittedAssociationList
         } catch (Exception ex) {
             Log.debug("problem making stream " + lab);
             Log.debug("exception is  " + ex.getMessage());
-
+            try {
+                s.close();
+            } catch (Exception ex1) {
+                Log.error(ex1.toString());
+            }
             if (Log.getLevel() >= Log.DEBUG) {
                 ex.printStackTrace(System.err);
             }
