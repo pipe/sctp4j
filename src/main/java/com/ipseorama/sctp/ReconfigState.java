@@ -152,6 +152,11 @@ class ReconfigState {
         return ret;
     }
 
+    /* we can only demand they close their outbound streams */
+    /* we can request they start to close inbound (ie ask us to shut our outbound */
+    /* DCEP treats streams as bi-directional - so this is somewhat of an inpedance mis-match */
+    /* resulting in a temporary 'half closed' state */
+    /* mull this over.... */
     ReConfigChunk makeClose(Integer id) throws Exception {
         ReConfigChunk ret = null;
         listOfStreamsToReset.add(id);
@@ -166,7 +171,7 @@ class ReconfigState {
         int[] streams = listOfStreamsToReset.stream().mapToInt((Integer i) -> {
             return i;
         }).toArray();
-        OutgoingSSNResetRequestParameter rep = new OutgoingSSNResetRequestParameter(nextNearNo(), 0, assoc.getNearTSN());
+        OutgoingSSNResetRequestParameter rep = new OutgoingSSNResetRequestParameter(nextNearNo(), farSeqno-1, assoc.getNearTSN());
         rep.setStreams(streams);
         return reply;
     }

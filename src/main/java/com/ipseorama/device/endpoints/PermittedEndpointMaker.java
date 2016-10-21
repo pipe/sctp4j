@@ -124,7 +124,11 @@ public abstract class PermittedEndpointMaker implements PermittedAssociationList
 
             @Override
             public void onMessage(SCTPStream s, String message) {
-                s.close();
+                try {
+                    s.close();
+                } catch (Exception ex) {
+                    Log.error("Can't close stream "+ex.getMessage());
+                }
             }
 
             @Override
