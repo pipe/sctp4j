@@ -20,6 +20,8 @@ package com.ipseorama.sctp;
 import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
 import com.ipseorama.sctp.messages.exceptions.UnreadyAssociationException;
 import com.ipseorama.base.dataChannel.DECP.DCOpen;
+import com.ipseorama.base.dataChannel.DTLSClient;
+import com.ipseorama.base.dataChannel.DTLSServer;
 import com.ipseorama.sctp.messages.*;
 
 import com.ipseorama.sctp.messages.exceptions.*;
@@ -46,7 +48,10 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
  */
 abstract public class Association {
 
+    private final boolean _even;
+
     public abstract void associate() throws SctpPacketFormatException, IOException;
+
 
 
 
@@ -282,6 +287,13 @@ abstract public class Association {
             Log.error("Created an Associaction with a null transport somehow...");
         }
         __assocNo++;
+        /*
+        the method used to determine which
+   side uses odd or even is based on the underlying DTLS connection
+   role: the side acting as the DTLS client MUST use Streams with even
+   Stream Identifiers, the side acting as the DTLS server MUST use
+   Streams with odd Stream Identifiers. */
+        _even = transport instanceof DTLSClient;
 
     }
 
@@ -299,7 +311,7 @@ abstract public class Association {
     public void send(Chunk c[]) throws SctpPacketFormatException, IOException {
         if ((c != null) && (c.length > 0)) {
             ByteBuffer obb = mkPkt(c);
-            Log.verb("sending packet" + Packet.getHex(obb));
+            Log.debug("sending SCTP packet" + Packet.getHex(obb));
             _transp.send(obb.array(), obb.arrayOffset(), obb.position());
         } else {
             Log.verb("Blocked empty packet send() - probably no response needed.");
@@ -603,7 +615,7 @@ abstract public class Association {
 
     private void ingest(DataChunk dc, ArrayList<Chunk> rep) {
         Log.verb("ingesting " + dc.toString());
-
+        Chunk closer = null;
         Integer sno = dc.getStreamId();
         long tsn = dc.getTsn();
         SCTPStream in = _streams.get(sno);
@@ -618,7 +630,11 @@ abstract public class Association {
             repa = dcepDeal(in, dc, dc.getDCEP());
             // delay 'till after first packet so we can get the label etc set 
             // _however_ this should be in behave -as mentioned above.
-            _al.onDCEPStream(in, in.getLabel(), dc.getPpid());
+            try {
+                _al.onDCEPStream(in, in.getLabel(), dc.getPpid());
+            } catch (Exception x){
+                closer = in.immediateClose();
+            }
         } else {
             repa = in.append(dc);
         }
@@ -627,6 +643,9 @@ abstract public class Association {
             for (Chunk r : repa) {
                 rep.add(r);
             }
+        }
+        if (closer != null ){
+            rep.add(closer);
         }
         in.inbound(dc);
         _farTSN = tsn;
@@ -816,11 +835,15 @@ abstract public class Association {
     long getCumAckPt() {
         return _farTSN;
     }
+    ReConfigChunk addToCloseList(SCTPStream st) throws Exception {
+        return reconfigState.makeClose(st);
+    }
 
-    public void closeStream(Integer id) throws SctpPacketFormatException, IOException, Exception{
+    public void closeStream(SCTPStream st) throws SctpPacketFormatException, IOException, Exception{
         Chunk []cs = new Chunk[1];
         if (canSend()){
-            cs[0] = reconfigState.makeClose(id);
+            Log.debug("due to reconfig stream "+st);
+            cs[0] = reconfigState.makeClose(st);
         }
         this.send(cs);
     }
@@ -830,7 +853,8 @@ abstract public class Association {
         int n = 1;
         int tries = this._maxOutStreams;
         do {
-            n = _random.nextInt(this._maxOutStreams);
+            n = 2*_random.nextInt(this._maxOutStreams);
+            if (!_even) n+=1;
             if (--tries < 0) {
                 throw new StreamNumberInUseException();
             }

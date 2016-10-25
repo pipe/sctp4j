@@ -26,7 +26,7 @@ class ReconfigState {
     long nearSeqno = 0;
     long farSeqno = 0;
     Association assoc;
-    ConcurrentLinkedQueue<Integer> listOfStreamsToReset;
+    ConcurrentLinkedQueue<SCTPStream> listOfStreamsToReset;
 
     ReconfigState(Association a, long farTSN) {
         nearSeqno = a.getNearTSN();
@@ -153,27 +153,48 @@ class ReconfigState {
     }
 
     /* we can only demand they close their outbound streams */
-    /* we can request they start to close inbound (ie ask us to shut our outbound */
-    /* DCEP treats streams as bi-directional - so this is somewhat of an inpedance mis-match */
-    /* resulting in a temporary 'half closed' state */
-    /* mull this over.... */
-    ReConfigChunk makeClose(Integer id) throws Exception {
+ /* we can request they start to close inbound (ie ask us to shut our outbound */
+ /* DCEP treats streams as bi-directional - so this is somewhat of an inpedance mis-match */
+ /* resulting in a temporary 'half closed' state */
+ /* mull this over.... */
+    ReConfigChunk makeClose(SCTPStream st) throws Exception {
         ReConfigChunk ret = null;
-        listOfStreamsToReset.add(id);
+        Log.debug("building reconfig so close stream " + st);
+        st.setClosing(true);
+        listOfStreamsToReset.add(st);
         if (!timerIsRunning()) {
-            ret = makeOutboundSSNReset();
+            ret = makeSSNResets();
         }
         return ret;
     }
 
-    private ReConfigChunk makeOutboundSSNReset() throws Exception {
+    private ReConfigChunk makeSSNResets() throws Exception {
+
         ReConfigChunk reply = new ReConfigChunk(); // create a new thing
-        int[] streams = listOfStreamsToReset.stream().mapToInt((Integer i) -> {
-            return i;
+        Log.debug("closing streams n=" + listOfStreamsToReset.size());
+        int[] streams = listOfStreamsToReset.stream().filter((SCTPStream s) -> {
+            return s.InboundIsOpen();
+        }).mapToInt((SCTPStream s) -> {
+            return s.getNum();
         }).toArray();
-        OutgoingSSNResetRequestParameter rep = new OutgoingSSNResetRequestParameter(nextNearNo(), farSeqno-1, assoc.getNearTSN());
-        rep.setStreams(streams);
+        if (streams.length > 0) {
+            OutgoingSSNResetRequestParameter rep = new OutgoingSSNResetRequestParameter(nextNearNo(), farSeqno - 1, assoc.getNearTSN());
+            rep.setStreams(streams);
+            reply.addParam(rep);
+        }
+        streams = listOfStreamsToReset.stream().filter((SCTPStream s) -> {
+            return s.OutboundIsOpen();
+        }).mapToInt((SCTPStream s) -> {
+            return s.getNum();
+        }).toArray();   
+        if (streams.length > 0) {
+            IncomingSSNResetRequestParameter rep = new IncomingSSNResetRequestParameter(nextNearNo());
+            rep.setStreams(streams);
+            reply.addParam(rep);
+        }
+        Log.debug("reconfig chunk is " + reply.toString());
         return reply;
     }
+
 
 }

@@ -50,10 +50,19 @@ public class IncomingSSNResetRequestParameter extends KnownParam {
         super(t, n);
     }
 
+    public IncomingSSNResetRequestParameter() {
+        super(14, "IncomingSSNResetRequestParameter");
+    }
+
+    public IncomingSSNResetRequestParameter(long reqNo) {
+        this();
+        this.reqSeqNo = reqNo;
+    }
+
     @Override
     public void readBody(ByteBuffer body, int blen) {
-        if (blen < 4){
-            Log.error("Huh ? No body to this "+this.getName());
+        if (blen < 4) {
+            Log.error("Huh ? No body to this " + this.getName());
             return;
         }
         reqSeqNo = Chunk.getUnsignedInt(body);
@@ -77,16 +86,16 @@ public class IncomingSSNResetRequestParameter extends KnownParam {
             }
         }
     }
-    
+
     @Override
-    public String toString(){
+    public String toString() {
         StringBuffer ret = new StringBuffer();
         ret.append(this.getClass().getSimpleName()).append(" ");
-        ret.append("seq:"+this.reqSeqNo);
-        if (streams != null){
+        ret.append("seq:" + this.reqSeqNo);
+        if (streams != null) {
             ret.append("streams {");
-            for (int s:streams){
-                ret.append(""+s);
+            for (int s : streams) {
+                ret.append("" + s);
             }
             ret.append("}");
         } else {
@@ -98,12 +107,15 @@ public class IncomingSSNResetRequestParameter extends KnownParam {
     public boolean sameAs(IncomingSSNResetRequestParameter other) {
         return this.reqSeqNo == other.reqSeqNo;
     }
-    public int [] getStreams(){
+
+    public int[] getStreams() {
         return streams;
     }
 
     public long getReqNo() {
         return this.reqSeqNo;
     }
-    
+    public void setStreams(int[] ss) {
+        this.streams =ss;
+    }
 }

@@ -27,7 +27,7 @@ public interface AssociationListener {
 
     public void onDisAssociated(Association a);
 
-    public void onDCEPStream(SCTPStream s, String label, int type);
+    public void onDCEPStream(SCTPStream s, String label, int type) throws Exception ;
 
     public void onRawStream(SCTPStream s);
 

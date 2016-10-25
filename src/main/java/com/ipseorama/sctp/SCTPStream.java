@@ -21,6 +21,7 @@ import com.ipseorama.sctp.behave.OrderedStreamBehaviour;
 import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
+import com.ipseorama.sctp.messages.ReConfigChunk;
 import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
 import com.phono.srtplight.Log;
 import java.io.IOException;
@@ -31,13 +32,13 @@ import java.util.TreeSet;
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
 public abstract class SCTPStream {
+
     /* unfortunately a webRTC SCTP stream can change it's reliability rules etc post creation
      so we can't encapsulate the streams into multiple implementations of the same interface/abstract
      So what we do is put the bulk of the stream code here, then delegate the variant rules off to the
      behave class - which has to be stateless since it can be swapped out - it is ugly 
      - and I wonder if closures would do it better.
      */
-
     private SCTPStreamBehaviour _behave;
     Association _ass;
     private Integer _sno;
@@ -46,6 +47,29 @@ public abstract class SCTPStream {
     private SCTPStreamListener _sl;
     private int _nextMessageSeqIn;
     private int _nextMessageSeqOut;
+    private boolean closing;
+    private State state = State.OPEN;
+
+    boolean InboundIsOpen() {
+        return ((state == State.OPEN) || (state == State.INBOUNDONLY));
+    }
+    boolean OutboundIsOpen() {
+        return ((state == State.OPEN) || (state == State.OUTBOUNDONLY));
+    }
+
+    public Chunk immediateClose()  {
+        Chunk ret = null;
+        try {
+            ret = _ass.addToCloseList(this);
+        } catch (Exception ex){
+            Log.error("Can't make immediate close for "+this._sno+" because "+ex.getMessage());
+        }
+        return ret;
+    }
+
+    enum State {
+        CLOSED, INBOUNDONLY, OUTBOUNDONLY, OPEN
+    }
 
     public SCTPStream(Association a, Integer id) {
         _ass = a;
@@ -58,6 +82,14 @@ public abstract class SCTPStream {
         _label = l;
     }
 
+    public Integer getNum(){
+        return new Integer(_sno);
+    }
+    
+    public String toString(){
+        return "Stream ("+_sno+") label:"+_label+" state:"+state+" behave:"+_behave.getClass().getSimpleName();
+    }
+    
     public Chunk[] append(DataChunk dc) {
         Log.debug("adding data to stash on stream " + _label + "(" + dc + ")");
         _stash.add(dc);
@@ -119,7 +151,8 @@ public abstract class SCTPStream {
     }
 
     public void close() throws Exception {
-        _ass.closeStream(this._sno);
+        Log.debug("closing stream " + this._label + " " + this._sno);
+        _ass.closeStream(this);
     }
 
     public void setNextMessageSeqIn(int expectedSeq) {
@@ -138,7 +171,7 @@ public abstract class SCTPStream {
         return _nextMessageSeqOut;
     }
 
-    abstract public void deliverMessage(SCTPMessage message); 
+    abstract public void deliverMessage(SCTPMessage message);
 
     void setDeferred(boolean b) {
         boolean deferred = true;
@@ -146,13 +179,52 @@ public abstract class SCTPStream {
 
     void reset() {
 
-        Log.debug("Resetting stream "+this._sno);
-        if (this._sl != null){
+        Log.debug("Resetting stream " + this._sno);
+        if (this._sl != null) {
             _sl.close(this);
         }
     }
 
     void setClosing(boolean b) {
-        boolean closing = b;
+        closing = b;
+    }
+
+    boolean isClosing() {
+        return closing;
+    }
+
+    void setOutboundClosed() {
+        switch (state) {
+            case OPEN:
+                state = State.INBOUNDONLY;
+                break;
+            case OUTBOUNDONLY:
+                state = State.CLOSED;
+                break;
+            case CLOSED:
+            case INBOUNDONLY:
+                break;
+        }
+        Log.debug("Stream State for " + _sno + " is now " + state);
+    }
+
+    void setInboundClosed() {
+        switch (state) {
+            case OPEN:
+                state = State.OUTBOUNDONLY;
+                break;
+            case INBOUNDONLY:
+                state = State.CLOSED;
+                break;
+            case CLOSED:
+            case OUTBOUNDONLY:
+                break;
+        }
+        Log.debug("Stream State for " + _sno + " is now " + state);
+    }
+
+    State getState() {
+        Log.debug("Stream State for " + _sno + " is currently " + state);
+        return state;
     }
 }
