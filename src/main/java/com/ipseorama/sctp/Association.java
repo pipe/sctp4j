@@ -311,7 +311,7 @@ abstract public class Association {
     public void send(Chunk c[]) throws SctpPacketFormatException, IOException {
         if ((c != null) && (c.length > 0)) {
             ByteBuffer obb = mkPkt(c);
-            Log.debug("sending SCTP packet" + Packet.getHex(obb));
+            Log.verb("sending SCTP packet" + Packet.getHex(obb));
             _transp.send(obb.array(), obb.arrayOffset(), obb.position());
         } else {
             Log.verb("Blocked empty packet send() - probably no response needed.");

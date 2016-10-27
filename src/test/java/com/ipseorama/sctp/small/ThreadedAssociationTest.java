@@ -19,8 +19,6 @@ import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -80,7 +78,7 @@ public class ThreadedAssociationTest {
 
     class MockAssociationListener implements AssociationListener {
 
-        Boolean associated = null;
+        Boolean associated = false;
         SCTPStream stream = null;
 
         @Override
@@ -99,7 +97,7 @@ public class ThreadedAssociationTest {
 
         @Override
         public void onDCEPStream(SCTPStream s, String label, int type) {
-            throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            Log.debug("dcep stream");
         }
 
         @Override
