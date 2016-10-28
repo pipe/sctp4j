@@ -43,7 +43,7 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
  */
 public class ThreadedAssociation extends Association implements Runnable {
 
-    final static int MAXBLOCKS = 200; // some number....
+    final static int MAXBLOCKS = 10; // some number....
     private ArrayBlockingQueue<DataChunk> _freeBlocks;
     private HashMap<Long, DataChunk> _inFlight;
     private long _lastCumuTSNAck;
@@ -135,8 +135,8 @@ public class ThreadedAssociation extends Association implements Runnable {
      RTO.Alpha - 1/8
      RTO.Beta - 1/4
      */
-    private final double _rtoBeta = 250.0;
-    private final double _rtoAlpha = 125.0;
+    private final double _rtoBeta = 0.2500;
+    private final double _rtoAlpha = 0.1250;
     private final double _rtoMin = 1.0;
     private final double _rtoMax = 60.0;
 
@@ -219,7 +219,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     }
 
     public long getT3() {
-        return (long) (1000.0 * _rto);
+        return (_rto > 0) ? (long) (1000.0 * _rto): 100;
     }
 
     @Override
@@ -711,7 +711,7 @@ public class ThreadedAssociation extends Association implements Runnable {
                 for (Long k : _inFlight.keySet()) {
                     DataChunk d = _inFlight.get(k);
                     if (d.getGapAck()) {
-                        Log.debug("skipping gap-acked tsn " + d.getTsn());
+                        Log.verb("skipping gap-acked tsn " + d.getTsn());
                         continue;
                     }
                     if (d.getRetryTime() <= now) {
@@ -743,6 +743,10 @@ public class ThreadedAssociation extends Association implements Runnable {
                     Log.debug("Sending retry for  " + da.length + " data chunks");
                     this.send(da);
                 } catch (java.io.EOFException end) {
+                    if (Log.getLevel() >= Log.DEBUG){
+                        Log.debug("Retry send failed "+end.getMessage());
+                        end.printStackTrace();
+                    }
                     unexpectedClose(end);
                     resetTimer = false;
                 } catch (Exception ex) {
@@ -753,7 +757,7 @@ public class ThreadedAssociation extends Association implements Runnable {
             }
             if (resetTimer) {
                 _timer.setRunnable(this, getT3());
-                Log.verb("Try again in a while  ");
+                Log.verb("Try again in a while  "+getT3());
 
             }
         }
@@ -814,7 +818,7 @@ public class ThreadedAssociation extends Association implements Runnable {
             _srtt = (1 - _rtoAlpha) * _srtt + _rtoAlpha * cr;
             nrto = _srtt + 4 * _rttvar;
         }
-        Log.debug("candidate  rto is " + nrto);
+        Log.debug("new r ="+r+"candidate  rto is " + nrto);
 
         if (nrto < _rtoMin) {
             Log.debug("clamping min rto as " + nrto + " < " + _rtoMin);
@@ -824,7 +828,10 @@ public class ThreadedAssociation extends Association implements Runnable {
             Log.debug("clamping max rto as " + nrto + " > " + _rtoMax);
             nrto = _rtoMax;
         }
-        _rto = nrto;
+        if ((nrto < _rtoMax) && (nrto > _rtoMin)){
+            // if still out of range (i.e. a NaN) ignore it.
+            _rto = nrto;
+        }
         Log.debug("new rto is " + _rto);
         /*
 

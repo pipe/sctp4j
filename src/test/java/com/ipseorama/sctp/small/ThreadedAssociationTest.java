@@ -176,6 +176,10 @@ public class ThreadedAssociationTest {
                 throw new java.io.EOFException("transport shut.");
             }
             Log.debug("Transport  shutdown.");
+            if (Log.getLevel() >= Log.DEBUG){
+                Exception where = new Exception("stack trace");
+                where.printStackTrace();
+            }
             _isShutdown = true;
 
         }
