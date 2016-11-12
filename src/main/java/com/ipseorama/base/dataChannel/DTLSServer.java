@@ -5,14 +5,17 @@
  */
 package com.ipseorama.base.dataChannel;
 
+import biz.source_code.Base64Coder;
 import com.ipseorama.base.certHolders.CertHolder;
 import com.ipseorama.device.endpoints.PermittedAssociationListener;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.AssociationListener;
 import com.phono.srtplight.Log;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.Hashtable;
+import java.util.Properties;
 import org.bouncycastle.crypto.tls.Certificate;
 import org.bouncycastle.crypto.tls.CertificateRequest;
 import org.bouncycastle.crypto.tls.ClientCertificateType;
@@ -23,6 +26,8 @@ import org.bouncycastle.crypto.tls.DefaultTlsServer;
 import org.bouncycastle.crypto.tls.DefaultTlsSignerCredentials;
 import org.bouncycastle.crypto.tls.ExtensionType;
 import org.bouncycastle.crypto.tls.ProtocolVersion;
+import org.bouncycastle.crypto.tls.TlsClientContext;
+import org.bouncycastle.crypto.tls.TlsContext;
 import org.bouncycastle.crypto.tls.TlsSRTPUtils;
 import org.bouncycastle.crypto.tls.TlsSignerCredentials;
 import org.bouncycastle.crypto.tls.UseSRTPData;
@@ -148,11 +153,25 @@ public abstract class DTLSServer extends
     }
 
     @Override
-    public Hashtable getServerExtensions()
-            throws IOException {
-        Hashtable serverExtensions = super.getServerExtensions();
-        // in theory we may want to offer srtp extensions - but not in the pure data case.
-        return serverExtensions;
+    public Hashtable getServerExtensions() throws IOException {
+        
+        // see https://tools.ietf.org/html/rfc5764 
+        
+        byte[] SRTP_AES128_CM_HMAC_SHA1_80 = {0x00, 0x01};
+        Hashtable ret = super.getServerExtensions();
+
+        byte [] prof = new byte[5];
+        
+        ByteBuffer profileB = ByteBuffer.wrap(prof);
+        profileB.putChar((char)2); // length;
+        profileB.put(SRTP_AES128_CM_HMAC_SHA1_80);
+        profileB.put((byte)0);// mkti
+
+        if (ret == null) {
+            ret = new Hashtable();
+        }
+        ret.put(ExtensionType.use_srtp, prof);
+        return ret;
     }
 
     /**
@@ -202,6 +221,9 @@ public abstract class DTLSServer extends
         }
         super.processClientExtensions(clientExtensions);
     }
-
+ 
+    public TlsContext getContext(){
+        return context;
+    }
 
 }

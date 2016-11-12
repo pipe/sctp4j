@@ -22,6 +22,8 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.bouncycastle.crypto.tls.DefaultTlsSignerCredentials;
 import org.bouncycastle.crypto.tls.ProtocolVersion;
 import org.bouncycastle.crypto.tls.TlsAuthentication;
+import org.bouncycastle.crypto.tls.TlsClientContext;
+import org.bouncycastle.crypto.tls.TlsContext;
 import org.bouncycastle.crypto.tls.TlsCredentials;
 
 /**
@@ -139,6 +141,10 @@ public abstract class DTLSClient extends
                 return new DefaultTlsSignerCredentials(context, _cert.getCert(), _cert.getKey());
             }
         };
+    }
+    
+    public TlsContext getContext(){
+        return context;
     }
 
 }

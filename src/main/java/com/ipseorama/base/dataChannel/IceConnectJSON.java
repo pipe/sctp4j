@@ -45,7 +45,7 @@ import javax.json.JsonValue;
 abstract public class IceConnectJSON {
 
     public String _session, _to, _type, _mid;
-    private String _us;
+    String _us;
     IceConnectFace _ice;
     public PropertyChangeListener onPropertyChange;
 
@@ -54,7 +54,6 @@ abstract public class IceConnectJSON {
     public IceConnectJSON(IceConnectFace ice) {
         _ice = ice;
         _us = _ice.getPrint().replace(":", "");
-
     }
 
     public void setCleanupCB(Runnable clean) {

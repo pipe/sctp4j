@@ -9,6 +9,7 @@ package com.ipseorama.base.dataChannel;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.AssociationListener;
 import org.bouncycastle.crypto.tls.DTLSTransport;
+import org.bouncycastle.crypto.tls.TlsContext;
 
 /**
  *
@@ -17,4 +18,6 @@ import org.bouncycastle.crypto.tls.DTLSTransport;
 public interface DTLSEndpoint {
     public boolean shouldInitiateAssociation();
     public Association makeAssociation(DTLSTransport trans, AssociationListener li);
+
+    public TlsContext getContext();
 }
