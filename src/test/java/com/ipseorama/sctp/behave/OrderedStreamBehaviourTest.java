@@ -227,6 +227,34 @@ public class OrderedStreamBehaviourTest {
         multiPartMessage(testStrings);
     }
 
+    @org.junit.Test
+    public void testDeliverVeryManyMessages() {
+        System.out.println("--> deliver very many messages");
+
+        String testStrings[] = new String[10000];
+        for (int i = 0; i < testStrings.length; i++) {
+            testStrings[i] = "Test String " + i;
+        }
+        SCTPStream s = mockStream();
+        SortedSet<DataChunk> stash = new TreeSet();
+        ArrayList<String> result = new ArrayList<String>();
+        char mo =0;
+        for (String ts : testStrings) {
+            DataChunk single = new DataChunk();
+            single.setTsn(_tsn++);
+            single.setsSeqNo((int)mo++);
+            single.setData(ts.getBytes());
+            single.setPpid(DataChunk.WEBRTCSTRING);
+            single.setFlags(DataChunk.SINGLEFLAG);
+            stash.add(single);
+            result.add(ts);
+        }
+        SCTPStreamListener l = new CheckingStreamListener(result);
+        OrderedStreamBehaviour instance = new OrderedStreamBehaviour();
+        instance.deliver(s, stash, l);
+        
+    }
+
     void multiPartMessage(String[] testStrings) {
         SCTPStream s = mockStream();
         SortedSet<DataChunk> stash = new TreeSet();
@@ -252,7 +280,6 @@ public class OrderedStreamBehaviourTest {
         SCTPStreamListener l = new CheckingStreamListener(result);
         OrderedStreamBehaviour instance = new OrderedStreamBehaviour();
         instance.deliver(s, stash, l);
-
         int remain = result.size();
         assertEquals(remain, 0);
     }

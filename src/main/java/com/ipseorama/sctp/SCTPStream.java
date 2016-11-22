@@ -156,7 +156,7 @@ public abstract class SCTPStream {
     }
 
     public void setNextMessageSeqIn(int expectedSeq) {
-        _nextMessageSeqIn = expectedSeq;
+        _nextMessageSeqIn = (expectedSeq < Character.MAX_VALUE)?expectedSeq:0;
     }
 
     public int getNextMessageSeqIn() {
@@ -164,7 +164,7 @@ public abstract class SCTPStream {
     }
 
     public void setNextMessageSeqOut(int expectedSeq) {
-        _nextMessageSeqOut = expectedSeq;
+        _nextMessageSeqOut = (expectedSeq < Character.MAX_VALUE)?expectedSeq:0;
     }
 
     public int getNextMessageSeqOut() {

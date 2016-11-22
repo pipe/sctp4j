@@ -37,9 +37,10 @@ public class OrderedStreamBehaviour implements SCTPStreamBehaviour {
         // we can deliver ordered messages on this stream even if earlier messages from other streams are missing
         // - this does assume that the tsn's of a message are contiguous -which is odd.
 
-        int messageNo = s.getNextMessageSeqIn();
 
         for (DataChunk dc : stash) {
+            int messageNo = s.getNextMessageSeqIn();
+
             int flags = dc.getFlags() & DataChunk.SINGLEFLAG; // mask to the bits we want
             long tsn = dc.getTsn();
             boolean lookingForOrderedMessages = _ordered || (message != null);
