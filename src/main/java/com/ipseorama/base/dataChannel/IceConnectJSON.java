@@ -17,24 +17,14 @@
  */
 package com.ipseorama.base.dataChannel;
 
-import com.ipseorama.base.certHolders.JksCertMaker;
 import com.ipseorama.sctp.AssociationListener;
 import com.phono.srtplight.Log;
-import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableEntryException;
-import java.security.cert.CertificateException;
-import java.util.List;
-import java.util.function.Consumer;
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonArrayBuilder;
 import javax.json.JsonObject;
-import javax.json.JsonObjectBuilder;
 import javax.json.JsonValue;
 
 
@@ -242,10 +232,10 @@ abstract public class IceConnectJSON {
                                 .add("address", "127.0.0.1")
                         )
                 )
-                /*.add("group", Json.createObjectBuilder()
+                .add("group", Json.createObjectBuilder()
                  .add("type", "BUNDLE")
                  .add("contents", Json.createArrayBuilder().add("data"))
-                 )*/
+                 )
                 .build();
         Log.verb("Sending" + ans.toString());
 
