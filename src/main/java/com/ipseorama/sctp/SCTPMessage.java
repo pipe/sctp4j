@@ -43,15 +43,15 @@ public class SCTPMessage implements Runnable {
      * @param s
      */
     public SCTPMessage(byte[] data, SCTPStream s) {
-        _data = data;
+        _data = (data.length > 0)?data:new byte[1];
         _stream = s;
-        _pPid = DataChunk.WEBRTCBINARY;
+        _pPid = (data.length > 0)?DataChunk.WEBRTCBINARY:DataChunk.WEBRTCBINARYEMPTY;
     }
 
     public SCTPMessage(String data, SCTPStream s) {
-        _data = data.getBytes();
+        _data = (data.length() > 0)?data.getBytes():new byte[1];
         _stream = s;
-        _pPid = DataChunk.WEBRTCSTRING;
+        _pPid = (data.length() > 0)?DataChunk.WEBRTCSTRING:DataChunk.WEBRTCSTRINGEMPTY;
     }
 
     public SCTPMessage(SCTPStream s, SortedSet<DataChunk> chunks) {
@@ -119,18 +119,17 @@ public class SCTPMessage implements Runnable {
                 dc.setData(_data, _offset, dsz);
                 _offset += dsz;
             }
-        } else {// not first
-            if (remain <= dsz) {
-                // last chunk, this will all fit.
-                dc.setFlags(dc.ENDFLAG);
-                dc.setData(_data, _offset, remain);
-                _offset += remain; // should be _data_length now
-            } else {
-                // middle chunk.
-                dc.setFlags(0);
-                dc.setData(_data, _offset, dsz);
-                _offset += dsz;
-            }
+        } else// not first
+        if (remain <= dsz) {
+            // last chunk, this will all fit.
+            dc.setFlags(dc.ENDFLAG);
+            dc.setData(_data, _offset, remain);
+            _offset += remain; // should be _data_length now
+        } else {
+            // middle chunk.
+            dc.setFlags(0);
+            dc.setData(_data, _offset, dsz);
+            _offset += dsz;
         }
         dc.setPpid(_pPid);
         dc.setsSeqNo(_mseq);
@@ -156,14 +155,23 @@ public class SCTPMessage implements Runnable {
     @Override
     public void run() {
         Log.debug("delegated message delivery from stream of type " + _stream.getClass().getSimpleName());
+        byte data[] = _data;
         if (_li != null) {
-            if ((_li instanceof SCTPByteStreamListener) && (_pPid == DataChunk.WEBRTCBINARY)) {
-                ((SCTPByteStreamListener) _li).onMessage(_stream, _data);
-                _delivered = true;
-            }
-            if (_pPid == DataChunk.WEBRTCSTRING) {
-                _li.onMessage(_stream, new String(_data));
-                _delivered = true;
+            switch (_pPid) {
+                case DataChunk.WEBRTCBINARYEMPTY:
+                    data = new byte[0];
+                case DataChunk.WEBRTCBINARY:
+                    if ((_li instanceof SCTPByteStreamListener)) {
+                        ((SCTPByteStreamListener) _li).onMessage(_stream, data);
+                        _delivered = true;
+                    }
+                    break;
+                case DataChunk.WEBRTCSTRINGEMPTY:
+                    data = new byte[0];
+                case DataChunk.WEBRTCSTRING:
+                    _li.onMessage(_stream, new String(_data));
+                    _delivered = true;
+                    break;
             }
         }
         if (!_delivered) {

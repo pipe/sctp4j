@@ -64,11 +64,6 @@ public class UDPForwardingStream extends BlockingSCTPStream implements Runnable 
         // clean up here.....
     }
 
-    synchronized private void send(byte[] buff) throws Exception {
-        Association a = super.getAssociation();
-        SCTPMessage m = a.makeMessage(buff, this);
-        a.sendAndBlock(m);
-    }
 
     private SCTPStreamBehaviour mkBehave() {
         return new UnorderedStreamBehaviour();

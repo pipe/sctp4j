@@ -11,6 +11,7 @@ import com.ipseorama.sctp.messages.SackChunk;
 import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
 import com.ipseorama.sctp.small.BlockingSCTPStream;
 import java.io.IOException;
+import java.util.Random;
 import java.util.TreeSet;
 import org.bouncycastle.crypto.tls.DatagramTransport;
 import org.junit.After;
@@ -26,6 +27,7 @@ import static org.junit.Assert.*;
  */
 public class SCTPMessageTest {
 
+    private Random _rand = new Random(1); // deterministic non crypto quality random for repeatable tests
     private SCTPStream _fakeStream;
 
     public SCTPMessageTest() {
@@ -119,6 +121,11 @@ public class SCTPMessageTest {
                 message.run();
             }
 
+            @Override
+            public void send(byte[] message) throws Exception {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
         };
     }
 
@@ -154,7 +161,7 @@ public class SCTPMessageTest {
      */
     @Test
     public void testFillShortString() {
-        System.out.println("--> fill short");
+        System.out.println("--> fill short string ");
         String testString = "This is a short test";
         SCTPMessage instance = new SCTPMessage(testString, _fakeStream);
         TreeSet<DataChunk> chunks = new TreeSet<DataChunk>();
@@ -164,8 +171,25 @@ public class SCTPMessageTest {
             chunks.add(dc);
         }
         assertEquals(chunks.size(), 1);
+        int ppid = ((DataChunk)chunks.first()).getPpid();
+        assertEquals(ppid,DataChunk.WEBRTCSTRING);
     }
-
+    @Test
+    public void testFillShortBlob() {
+        System.out.println("--> fill short blob ");
+        byte [] testBlob = new byte[21];
+        _rand.nextBytes(testBlob);
+        SCTPMessage instance = new SCTPMessage(testBlob, _fakeStream);
+        TreeSet<DataChunk> chunks = new TreeSet<DataChunk>();
+        while (instance.hasMoreData()) {
+            DataChunk dc = new DataChunk();
+            instance.fill(dc);
+            chunks.add(dc);
+        }
+        assertEquals(chunks.size(), 1);
+        int ppid = ((DataChunk)chunks.first()).getPpid();
+        assertEquals(ppid,DataChunk.WEBRTCBINARY);
+    }
     @Test
     public void testFillLongString() {
         System.out.println("--> fill long");
@@ -189,7 +213,50 @@ public class SCTPMessageTest {
         int estimate = (int) Math.ceil(testString.length() / pktsz);
         assertEquals(chunks.size(), estimate);
     }
+    
+    @Test
+    public void testEmptyString() {
+        System.out.println("--> fill empty string");
+        StringBuffer sb = new StringBuffer("");
+        String testString = sb.toString();
+        SCTPMessage instance = new SCTPMessage(testString, _fakeStream);
+        TreeSet<DataChunk> chunks = new TreeSet<DataChunk>();
+        long tsn = 111;
 
+        while (instance.hasMoreData()) {
+            DataChunk dc = new DataChunk();
+            dc.setTsn(tsn++);
+            instance.fill(dc);
+            chunks.add(dc);
+        }
+        int pktsz = chunks.first().getDataSize();
+        assertEquals(chunks.size(), 1);
+        assertEquals(pktsz,1);
+        int ppid = ((DataChunk)chunks.first()).getPpid();
+        assertEquals(ppid,DataChunk.WEBRTCSTRINGEMPTY);
+    }
+    
+    @Test
+    public void testEmptyBlob() {
+        System.out.println("--> fill empty blob");
+        byte [] testBlob = new byte[0];
+        SCTPMessage instance = new SCTPMessage(testBlob, _fakeStream);
+        TreeSet<DataChunk> chunks = new TreeSet<DataChunk>();
+        long tsn = 111;
+
+        while (instance.hasMoreData()) {
+            DataChunk dc = new DataChunk();
+            dc.setTsn(tsn++);
+            instance.fill(dc);
+            chunks.add(dc);
+        }
+        assertEquals(chunks.size(), 1);
+        int pktsz = chunks.first().getDataSize();
+        assertEquals(pktsz,1);
+        int ppid = ((DataChunk)chunks.first()).getPpid();
+        assertEquals(ppid,DataChunk.WEBRTCBINARYEMPTY);
+    }
+    
     /**
      * Test of getData method, of class SCTPMessage.
      */

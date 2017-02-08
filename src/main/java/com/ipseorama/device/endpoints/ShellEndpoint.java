@@ -132,6 +132,11 @@ public class ShellEndpoint extends JsonEndpoint {
                 throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
 
+            @Override
+            public void send(byte[] message) throws Exception {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
         };
         Log.debug("made dummy stream... ");
 

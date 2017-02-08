@@ -145,6 +145,7 @@ public abstract class SCTPStream {
     }
 
     abstract public void send(String message) throws Exception;
+    abstract public void send(byte[] message) throws Exception;
 
     public Association getAssociation() {
         return _ass;

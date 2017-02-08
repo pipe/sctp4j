@@ -42,7 +42,12 @@ public class BlockingSCTPStream extends SCTPStream {
         SCTPMessage m = a.makeMessage(message, this);
         a.sendAndBlock(m);
     }
-
+    @Override
+    synchronized public void send(byte[] message) throws Exception {
+        Association a = super.getAssociation();
+        SCTPMessage m = a.makeMessage(message, this);
+        a.sendAndBlock(m);
+    }
 
     @Override
     public void deliverMessage(SCTPMessage message) {

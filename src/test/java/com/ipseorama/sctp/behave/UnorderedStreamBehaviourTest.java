@@ -10,9 +10,7 @@ import com.ipseorama.sctp.SCTPMessage;
 import com.ipseorama.sctp.SCTPStream;
 import com.ipseorama.sctp.SCTPStreamListener;
 import com.ipseorama.sctp.messages.DataChunk;
-import com.phono.srtplight.Log;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 import java.util.SortedSet;
@@ -63,6 +61,11 @@ public class UnorderedStreamBehaviourTest {
             @Override
             public void deliverMessage(SCTPMessage message) {
                 message.run();
+            }
+
+            @Override
+            public void send(byte[] message) throws Exception {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
         };
     }

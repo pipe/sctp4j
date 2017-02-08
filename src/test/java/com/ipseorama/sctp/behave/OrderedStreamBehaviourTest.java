@@ -101,6 +101,11 @@ public class OrderedStreamBehaviourTest {
             public void deliverMessage(SCTPMessage message) {
                 message.run();
             }
+
+            @Override
+            public void send(byte[] message) throws Exception {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
         };
     }
 

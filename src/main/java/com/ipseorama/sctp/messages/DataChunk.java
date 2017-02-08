@@ -27,21 +27,30 @@ import java.util.Comparator;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-public class DataChunk extends Chunk implements Comparable,Comparator {
+public class DataChunk extends Chunk implements Comparable, Comparator {
+
     /*
-     +------------------------------------+-----------+-----------+
-     | Value                              | SCTP PPID | Reference |
-     +------------------------------------+-----------+-----------+
-     | WebRTC String                      | 51        | [RFCXXXX] |
-     | WebRTC Binary Partial (Deprecated) | 52        | [RFCXXXX] |
-     | WebRTC Binary                      | 53        | [RFCXXXX] |
-     | WebRTC String Partial (Deprecated) | 54        | [RFCXXXX] |
-     +------------------------------------+-----------+-----------+
+   +-------------------------------+----------+-----------+------------+
+   | Value                         | SCTP     | Reference | Date       |
+   |                               | PPID     |           |            |
+   +-------------------------------+----------+-----------+------------+
+   | WebRTC String                 | 51       | [RFCXXXX] | 2013-09-20 |
+   | WebRTC Binary Partial         | 52       | [RFCXXXX] | 2013-09-20 |
+   | (Deprecated)                  |          |           |            |
+   | WebRTC Binary                 | 53       | [RFCXXXX] | 2013-09-20 |
+   | WebRTC String Partial         | 54       | [RFCXXXX] | 2013-09-20 |
+   | (Deprecated)                  |          |           |            |
+   | WebRTC String Empty           | 56       | [RFCXXXX] | 2014-08-22 |
+   | WebRTC Binary Empty           | 57       | [RFCXXXX] | 2014-08-22 |
+   +-------------------------------+----------+-----------+------------+
+
      */
 
     public final static int WEBRTCCONTROL = 50;
     public final static int WEBRTCSTRING = 51;
     public final static int WEBRTCBINARY = 53;
+    public final static int WEBRTCSTRINGEMPTY = 56;
+    public final static int WEBRTCBINARYEMPTY = 57;
 
     public final static int BEGINFLAG = 2;
     public final static int ENDFLAG = 1;
@@ -94,15 +103,15 @@ public class DataChunk extends Chunk implements Comparable,Comparator {
                     // what format is a string ?
                     _data = new byte[_body.remaining()];
                     _body.get(_data);
-                    _dataOffset =0; 
-                    _dataLength =_data.length;
+                    _dataOffset = 0;
+                    _dataLength = _data.length;
                     Log.verb("String data is " + new String(_data));
                     break;
                 case WEBRTCBINARY:
                     _data = new byte[_body.remaining()];
                     _body.get(_data);
-                    _dataOffset =0; 
-                    _dataLength =_data.length;
+                    _dataOffset = 0;
+                    _dataLength = _data.length;
                     Log.verb("data is " + Packet.getHex(_data));
                     break;
 
@@ -122,10 +131,16 @@ public class DataChunk extends Chunk implements Comparable,Comparator {
             case WEBRTCSTRING:
                 ret = new String(_data, _dataOffset, _dataLength);
                 break;
+            case WEBRTCSTRINGEMPTY:
+                ret = "Empty String message";
+                break;
             case WEBRTCBINARY:
                 byte[] p = new byte[_dataLength];
                 System.arraycopy(_data, _dataOffset, p, 0, _dataLength);
                 ret = Packet.getHex(_data);
+                break;
+            case WEBRTCBINARYEMPTY:
+                ret = "Empty binay message";
                 break;
             default:
                 ret = "Invalid Protocol Id in data Chunk " + _ppid;
@@ -145,6 +160,7 @@ public class DataChunk extends Chunk implements Comparable,Comparator {
         super((byte) Chunk.DATA);
         setFlags(0); // default assumption.
     }
+
     /*
    
      0                   1                   2                   3
@@ -199,13 +215,12 @@ public class DataChunk extends Chunk implements Comparable,Comparator {
 
     public int getChunkLength() {
         int len = super.getLength();
-        if (len == 0){
+        if (len == 0) {
             // ie outbound chunk.
-            len = _dataLength +  12 + 4;
+            len = _dataLength + 12 + 4;
         }
         return len;
     }
-    
 
     @Override
     void putFixedParams(ByteBuffer ret) {
@@ -255,16 +270,17 @@ public class DataChunk extends Chunk implements Comparable,Comparator {
         return open;
     }
 
+    /*
     public DataChunk(String s) {
         this();
         _data = s.getBytes();
         _ppid = WEBRTCSTRING;
     }
-
+     */
     public String toString() {
         String ret = super.toString();
-        ret += " ppid = " + _ppid + "seqn " + _sSeqNo + " streamId " + _streamId + " tsn " + _tsn 
-            + " retry "+_retryTime+" gap acked "+_gapAck;
+        ret += " ppid = " + _ppid + "seqn " + _sSeqNo + " streamId " + _streamId + " tsn " + _tsn
+                + " retry " + _retryTime + " gap acked " + _gapAck;
         return ret;
     }
 
@@ -307,20 +323,21 @@ public class DataChunk extends Chunk implements Comparable,Comparator {
 
     public void setRetryTime(long l) {
         _retryTime = l;
-        _retryCount ++;
+        _retryCount++;
     }
-    public long getRetryTime(){
+
+    public long getRetryTime() {
         return _retryTime;
     }
 
     @Override
     public int compareTo(Object o) {
-        return compare(this,o);
+        return compare(this, o);
     }
 
     @Override
     public int compare(Object o1, Object o2) {
-        return (int) (((DataChunk)o1)._tsn - ((DataChunk)o2)._tsn);
+        return (int) (((DataChunk) o1)._tsn - ((DataChunk) o2)._tsn);
     }
 
     public long getSentTime() {
@@ -330,5 +347,5 @@ public class DataChunk extends Chunk implements Comparable,Comparator {
     public void setSentTime(long now) {
         _sentTime = now;
     }
-        
+
 }
