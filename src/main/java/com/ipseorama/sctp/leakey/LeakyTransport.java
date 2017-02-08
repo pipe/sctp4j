@@ -79,6 +79,15 @@ class LeakyTransport implements DatagramTransport {
 
     @Override
     public void send(byte[] bytes, int offs, int len) throws IOException {
+        if ((bytes == null) || (bytes.length < offs + len) || (bytes.length <1)){
+            Log.error("Implausible packet for encryption ");
+            if (bytes == null) {
+                Log.error("null buffer");
+            }else {
+                Log.error("Length ="+bytes.length+" len ="+len+" offs="+offs);
+            }
+            return;
+        }
         try {
             DatagramPacket p = new DatagramPacket(bytes, offs, len, _logrec.getLocalSocketAddress());
             _logsend.send(p);

@@ -308,11 +308,13 @@ abstract public class Association {
         return true;
     }
 
-    public void send(Chunk c[]) throws SctpPacketFormatException, IOException {
+    protected void send(Chunk c[]) throws SctpPacketFormatException, IOException {
         if ((c != null) && (c.length > 0)) {
             ByteBuffer obb = mkPkt(c);
             Log.verb("sending SCTP packet" + Packet.getHex(obb));
-            _transp.send(obb.array(), obb.arrayOffset(), obb.position());
+            synchronized (this) {
+                _transp.send(obb.array(), obb.arrayOffset(), obb.position());
+            }
         } else {
             Log.verb("Blocked empty packet send() - probably no response needed.");
         }
