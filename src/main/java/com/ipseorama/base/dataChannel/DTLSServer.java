@@ -48,6 +48,7 @@ public abstract class DTLSServer extends
     private boolean _verified = false;
     private Object nap;
     private final DatagramTransport _dt;
+    private boolean wantRTP;
 
     public DTLSServer(CertHolder cert, DatagramTransport dt, AssociationListener al, String farFingerprint) throws Exception {
 
@@ -72,7 +73,9 @@ public abstract class DTLSServer extends
         }
 
     }
-
+    protected void setWantRTP(boolean want){
+        this.wantRTP = want;
+    }
     static String getHex(byte[] in) {
         return getHex(in, in.length);
     }
@@ -101,7 +104,7 @@ public abstract class DTLSServer extends
             Log.debug("DTLS accept. verified = " + _verified);
             if (_verified) {
                 Association a = makeAssociation(dtlsServer, _al); // todo - association listener api is wrong.
-                if (shouldInitiateAssociation()){
+                if (shouldInitiateAssociation()) {
                     a.associate();
                 }
             } else {
@@ -154,23 +157,23 @@ public abstract class DTLSServer extends
 
     @Override
     public Hashtable getServerExtensions() throws IOException {
-        
+
         // see https://tools.ietf.org/html/rfc5764 
-        
         byte[] SRTP_AES128_CM_HMAC_SHA1_80 = {0x00, 0x01};
         Hashtable ret = super.getServerExtensions();
 
-        byte [] prof = new byte[5];
-        
-        ByteBuffer profileB = ByteBuffer.wrap(prof);
-        profileB.putChar((char)2); // length;
-        profileB.put(SRTP_AES128_CM_HMAC_SHA1_80);
-        profileB.put((byte)0);// mkti
+        byte[] prof = new byte[5];
 
-        if (ret == null) {
-            ret = new Hashtable();
+        ByteBuffer profileB = ByteBuffer.wrap(prof);
+        profileB.putChar((char) 2); // length;
+        profileB.put(SRTP_AES128_CM_HMAC_SHA1_80);
+        profileB.put((byte) 0);// mkti
+        if (wantRTP) {
+            if (ret == null) {
+                ret = new Hashtable();
+            }
+            ret.put(ExtensionType.use_srtp, prof);
         }
-        ret.put(ExtensionType.use_srtp, prof);
         return ret;
     }
 
@@ -221,8 +224,8 @@ public abstract class DTLSServer extends
         }
         super.processClientExtensions(clientExtensions);
     }
- 
-    public TlsContext getContext(){
+
+    public TlsContext getContext() {
         return context;
     }
 
