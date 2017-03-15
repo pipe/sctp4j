@@ -7,6 +7,7 @@ package com.ipseorama.device.endpoints;
 
 import com.ipseorama.sctp.SCTPMessage;
 import com.ipseorama.sctp.SCTPStream;
+import com.ipseorama.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -134,6 +135,11 @@ public class ShellEndpoint extends JsonEndpoint {
 
             @Override
             public void send(byte[] message) throws Exception {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            @Override
+            public void delivered(DataChunk d) {
                 throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
 

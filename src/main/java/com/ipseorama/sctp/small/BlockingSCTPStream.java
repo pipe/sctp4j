@@ -20,6 +20,9 @@ package com.ipseorama.sctp.small;
 import com.ipseorama.sctp.SCTPMessage;
 import com.ipseorama.sctp.Association;
 import com.ipseorama.sctp.SCTPStream;
+import com.ipseorama.sctp.messages.DataChunk;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -30,7 +33,8 @@ import java.util.concurrent.Executors;
 public class BlockingSCTPStream extends SCTPStream {
 
     private final ExecutorService _ex_service;
-
+    private HashMap<Integer,SCTPMessage> undeliveredOutboundMessages = new HashMap();
+    
     BlockingSCTPStream(Association a, Integer id) {
         super(a, id);
         _ex_service = Executors.newSingleThreadExecutor();
@@ -40,12 +44,14 @@ public class BlockingSCTPStream extends SCTPStream {
     synchronized public void send(String message) throws Exception {
         Association a = super.getAssociation();
         SCTPMessage m = a.makeMessage(message, this);
+        
         a.sendAndBlock(m);
     }
     @Override
     synchronized public void send(byte[] message) throws Exception {
         Association a = super.getAssociation();
         SCTPMessage m = a.makeMessage(message, this);
+        undeliveredOutboundMessages.put(m.getSeq(),m);
         a.sendAndBlock(m);
     }
 
@@ -54,4 +60,19 @@ public class BlockingSCTPStream extends SCTPStream {
         _ex_service.execute(message); // switch to callable ?
     }
 
+    @Override
+    public void delivered(DataChunk d) {
+        int f = d.getFlags();
+        if ((f & DataChunk.ENDFLAG) > 0){
+            int ssn = d.getSSeqNo();
+            SCTPMessage st = undeliveredOutboundMessages.remove(ssn);
+            if (st != null) {st.acked();}
+        }
+    }
+
+    @Override
+    public boolean idle(){
+        return undeliveredOutboundMessages.isEmpty();
+    }
+    
 }

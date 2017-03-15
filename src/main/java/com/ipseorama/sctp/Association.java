@@ -873,7 +873,7 @@ abstract public class Association {
         }
         return ret;
     }
-    SCTPStream getStream(int s) {
+    protected SCTPStream getStream(int s) {
         return _streams.get(s);
     }
 

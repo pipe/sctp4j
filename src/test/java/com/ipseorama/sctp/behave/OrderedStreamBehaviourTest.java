@@ -106,6 +106,11 @@ public class OrderedStreamBehaviourTest {
             public void send(byte[] message) throws Exception {
                 throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
+
+            @Override
+            public void delivered(DataChunk d) {
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
         };
     }
 

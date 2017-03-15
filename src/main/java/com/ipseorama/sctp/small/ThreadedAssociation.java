@@ -459,7 +459,9 @@ public class ThreadedAssociation extends Association implements Runnable {
                      */
                     setRTO(now - d.getSentTime());
                     try {
-                        // todo Notify stream that this one is acked
+                        int sid = d.getStreamId();
+                        SCTPStream stream = getStream(sid);
+                        if(stream != null) {stream.delivered(d);}
                         _freeBlocks.put(d);
                     } catch (InterruptedException ex) {
                         Log.error("eek - can't replace free block on list!?!");

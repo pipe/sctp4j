@@ -151,6 +151,9 @@ public class SCTPMessage implements Runnable {
     public void setSeq(int mseq) {
         _mseq = mseq;
     }
+    public int getSeq(){
+        return _mseq;
+    }
 
     @Override
     public void run() {
@@ -177,6 +180,9 @@ public class SCTPMessage implements Runnable {
         if (!_delivered) {
             Log.debug("Undelivered message to " + (_stream == null ? "null stream" : _stream.getLabel()) + " via " + (_li == null ? "null listener" : _li.getClass().getSimpleName()) + " ppid is " + _pPid);
         }
+    }
+
+    public void acked() {
     }
 
 }

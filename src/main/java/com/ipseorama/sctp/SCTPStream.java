@@ -21,10 +21,7 @@ import com.ipseorama.sctp.behave.OrderedStreamBehaviour;
 import com.ipseorama.sctp.behave.SCTPStreamBehaviour;
 import com.ipseorama.sctp.messages.Chunk;
 import com.ipseorama.sctp.messages.DataChunk;
-import com.ipseorama.sctp.messages.ReConfigChunk;
-import com.ipseorama.sctp.messages.exceptions.SctpPacketFormatException;
 import com.phono.srtplight.Log;
-import java.io.IOException;
 import java.util.TreeSet;
 
 /**
@@ -53,19 +50,22 @@ public abstract class SCTPStream {
     boolean InboundIsOpen() {
         return ((state == State.OPEN) || (state == State.INBOUNDONLY));
     }
+
     boolean OutboundIsOpen() {
         return ((state == State.OPEN) || (state == State.OUTBOUNDONLY));
     }
 
-    public Chunk immediateClose()  {
+    public Chunk immediateClose() {
         Chunk ret = null;
         try {
             ret = _ass.addToCloseList(this);
-        } catch (Exception ex){
-            Log.error("Can't make immediate close for "+this._sno+" because "+ex.getMessage());
+        } catch (Exception ex) {
+            Log.error("Can't make immediate close for " + this._sno + " because " + ex.getMessage());
         }
         return ret;
     }
+
+    abstract public void delivered(DataChunk d);
 
     enum State {
         CLOSED, INBOUNDONLY, OUTBOUNDONLY, OPEN
@@ -82,14 +82,14 @@ public abstract class SCTPStream {
         _label = l;
     }
 
-    public Integer getNum(){
+    public Integer getNum() {
         return new Integer(_sno);
     }
-    
-    public String toString(){
-        return "Stream ("+_sno+") label:"+_label+" state:"+state+" behave:"+_behave.getClass().getSimpleName();
+
+    public String toString() {
+        return "Stream (" + _sno + ") label:" + _label + " state:" + state + " behave:" + _behave.getClass().getSimpleName();
     }
-    
+
     public Chunk[] append(DataChunk dc) {
         Log.debug("adding data to stash on stream " + _label + "(" + dc + ")");
         _stash.add(dc);
@@ -145,6 +145,7 @@ public abstract class SCTPStream {
     }
 
     abstract public void send(String message) throws Exception;
+
     abstract public void send(byte[] message) throws Exception;
 
     public Association getAssociation() {
@@ -157,7 +158,7 @@ public abstract class SCTPStream {
     }
 
     public void setNextMessageSeqIn(int expectedSeq) {
-        _nextMessageSeqIn = (expectedSeq == 1+ Character.MAX_VALUE)?0:expectedSeq;
+        _nextMessageSeqIn = (expectedSeq == 1 + Character.MAX_VALUE) ? 0 : expectedSeq;
     }
 
     public int getNextMessageSeqIn() {
@@ -165,7 +166,7 @@ public abstract class SCTPStream {
     }
 
     public void setNextMessageSeqOut(int expectedSeq) {
-        _nextMessageSeqOut = (expectedSeq == 1+ Character.MAX_VALUE)?0:expectedSeq;
+        _nextMessageSeqOut = (expectedSeq == 1 + Character.MAX_VALUE) ? 0 : expectedSeq;
     }
 
     public int getNextMessageSeqOut() {
@@ -227,5 +228,9 @@ public abstract class SCTPStream {
     State getState() {
         Log.debug("Stream State for " + _sno + " is currently " + state);
         return state;
+    }
+
+    public boolean idle() {
+        return true;
     }
 }
