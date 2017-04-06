@@ -73,9 +73,9 @@ abstract public class IceConnectJSON {
         setSDP(message);
     }
 
-    public void setSession(String session) {
+    /*public void setSession(String session) {
         _session = session;
-    }
+    }*/
 
     public void setMid(String mid) {
         _mid = mid;
@@ -84,15 +84,42 @@ abstract public class IceConnectJSON {
     public void setSDP(JsonObject message) throws IOException {
         // honestly - you look at this and you just wish for groovy or xpath to write this in a declarative way.
         JsonObject sdpo = message.getJsonObject("sdp");
-        _session = message.getString("session");
-        _to = message.getString("to");
-        _type = message.getString("type");
+        String to = message.getString("to");
+        String from = message.getString("from");
+        String type = message.getString("type");
+
+        String session = message.getString("session");
+        
+        // Some basic verification 
+        if (to.equals(_us)){
+            _to = to;
+        }else {
+            throw new IOException("This message isn't for us.");
+        }
+        
+        if (_session == null){
+            _session = session;
+            if ("offer".equals(type)){ // you cant start a session with an answer
+                _type = type;
+            } else {
+                throw new IOException("Sessions must start with an offer");
+            }
+        } else {
+            if (!_session.equals(session)){
+                throw new IOException("Wrong session");
+            }
+        }
+
 
         JsonArray contents = sdpo.getJsonArray("contents");
         for (JsonValue content : contents) {
             JsonObject fpo = ((JsonObject) content).getJsonObject("fingerprint");
             if ("sha-256".equalsIgnoreCase(fpo.getString("hash"))) {
                 String ffp = fpo.getString("print");
+                String ff = ffp.replace(":", "");
+                if (!ff.equals(from)){
+                    throw new IOException("offered fingerprint isn't same as from address - not a valid |pipe| app");
+                }
                 _ice.setFarFingerprint(ffp);
             }
             JsonObject media = ((JsonObject) content).getJsonObject("media");
@@ -122,21 +149,18 @@ abstract public class IceConnectJSON {
                 String pass = ice.getString("pwd");
                 try {
                     _ice.buildIce(ufrag, pass);
-                } catch (InterruptedException ex) {
-                    Log.error(ex.toString());
-                } catch (IllegalArgumentException ex) {
+                } catch (InterruptedException | IllegalArgumentException ex) {
                     Log.error(ex.toString());
                 }
                 JsonArray candies = ((JsonObject) content).getJsonArray("candidates");
-                for (JsonValue v_candy : candies) {
-                    JsonObject jcandy = (JsonObject) v_candy;
+                candies.stream().map((v_candy) -> (JsonObject) v_candy).forEach((jcandy) -> {
                     addJasonCandy(jcandy);
-                }
+                });
             }
         }
         String fp = _ice.getFarFingerprint();
         if (fp == null) {
-            throw new IOException("No fingerptint set");
+            throw new IOException("No fingerprint set");
         }
     }
 
@@ -157,7 +181,7 @@ abstract public class IceConnectJSON {
         String session = message.getString("session");
         String to = message.getString("to");
         String type = message.getString("type");
-        if (to.equals(_to) && (type.equalsIgnoreCase("candidate"))) {
+        if (to.equals(_to) && (type.equalsIgnoreCase("candidate")) && session.equals(_session)) {
             JsonObject jcandy = message.getJsonObject("candidate");
             addJasonCandy(jcandy);
         }
