@@ -1,0 +1,18 @@
+SCTP4J - by |pipe|
+
+This is a pure java implementation of the SCTP protocol.
+The target usecase is small devices that want to run the webRTC datachannel.
+
+This implementation does not include all the necessary parts for a full 
+webRTC stack. You'll need DTLS (we use Bouncy Castle) and ICE/STUN/TURN (you can use Jitsi's ice4j).
+
+This implementation assumes that datagrams will arrive from an DTLS/ICE stack
+which implements a Datagram Transport. It also assumes a consumer of open SCTP Streams (or datachannels) - it is pure middleware.
+
+The stack tries to keep the details of concurrency in a single package, so that the current pure thread model could be replaced with Akka actors or NIO-like async mechanisms.
+
+This implementation works well on small devices (eg Raspberry Pi, C.H.I.P etc)
+
+Thanks to Michael Tüxen (@tuexen) for help and advice
+Thanks to Emil Ivov (@Emcho) for Ice4J and encouragement.
+
