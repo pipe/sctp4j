@@ -15,11 +15,12 @@
     </properties>
 
 <repositories>
-    <!--other repositories if any-->
     <repository>
-        <id>project.local</id>
-        <name>project</name>
-        <url>file:${project.basedir}/repo</url>
+        <id>github</id>
+        <name>Srtplight</name>
+        <url>https://maven.pkg.github.com/steely-glint/srtplight</url>
+        <releases><enabled>true</enabled></releases>
+        <snapshots><enabled>true</enabled></snapshots>
     </repository>
 </repositories>
     
@@ -60,7 +61,7 @@
 <dependency>
     <groupId>com.phono</groupId>
     <artifactId>srtplight</artifactId>
-    <version>1.1.6</version>
+    <version>1.1.7</version>
 </dependency>
     </dependencies>
 
