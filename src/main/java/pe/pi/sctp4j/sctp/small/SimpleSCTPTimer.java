@@ -17,10 +17,9 @@
 
 package pe.pi.sctp4j.sctp.small;
 
-import pe.pi.sctp4j.sctp.SCTPTimer;
-import com.phono.srtplight.Log;
 import java.util.Timer;
 import java.util.TimerTask;
+import pe.pi.sctp4j.sctp.SCTPTimer;
 
 /**
  *
@@ -29,28 +28,20 @@ import java.util.TimerTask;
  * runnable to decide if something needs to be done or not.
  */
 class SimpleSCTPTimer implements SCTPTimer {
-    private Timer _timer;
-
-    public SimpleSCTPTimer() {
-        _timer = new Timer();        
-    }
+    protected  static Timer _timer = new Timer("SCTPTimer",true); 
+    static int tno = 1;
+    
 
     @Override
     public void setRunnable(Runnable r, long at) {
-        final Runnable torun = r;
-        TimerTask tick = new TimerTask(){
+        TimerTask tt = new TimerTask(){
             @Override
             public void run() {
-                torun.run();
-            }         
+                r.run();
+            }
+            
         };
-        try {
-            _timer.schedule(tick, at);
-        } catch (IllegalStateException x) {
-            Log.warn("Stupid Java7 timer died with "+x.getMessage()+" creating a new one");
-            _timer = new Timer();
-            _timer.schedule(tick, at);
-        }
+        _timer.schedule(tt, at);
     }
     
 }

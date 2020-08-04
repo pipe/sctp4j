@@ -29,6 +29,7 @@ import pe.pi.sctp4j.sctp.small.BlockingSCTPStream;
 import com.phono.srtplight.Log;
 import java.io.EOFException;
 import java.io.IOException;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -38,7 +39,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import org.bouncycastle.crypto.tls.DatagramTransport;
+import org.bouncycastle.tls.DatagramTransport;
 
 /**
  *
@@ -49,11 +50,6 @@ abstract public class Association {
     private final boolean _even;
 
     public abstract void associate() throws SctpPacketFormatException, IOException;
-
-
-
-
-
 
     /**
      * <code>
@@ -152,7 +148,7 @@ abstract public class Association {
     static int __assocNo = 1;
     private ReconfigState reconfigState;
 
-    ;
+    private String peerId;
 
     class CookieHolder {
 
@@ -164,9 +160,19 @@ abstract public class Association {
     protected byte[] getSupportedExtensions() { // this lets others swithc features off.
         return _supportedExtensions;
     }
+
     long getNearTSN() {
         return _nearTSN;
     }
+
+    public String getPeerId() {
+        return peerId;
+    }
+
+    public void setPeerId(String peer) {
+        peerId = peer;
+    }
+
     byte[] getUnionSupportedExtensions(byte far[]) {
         ByteBuffer unionbb = ByteBuffer.allocate(far.length);
         for (int f = 0; f < far.length; f++) {
@@ -232,18 +238,24 @@ abstract public class Association {
         Runnable r = new Runnable() {
             @Override
             public void run() {
+                int length = -99;
                 try {
-                    byte[] buf = new byte[_transp.getReceiveLimit()];
+                    byte[] buf = new byte[1500];
                     while (_rcv != null) {
                         try {
-                            int length = _transp.receive(buf, 0, buf.length, TICK);
-                            String b = Packet.getHex(buf, length);
-                            Log.verb("DTLS message recieved\n" + b.toString());
-                            ByteBuffer pbb = ByteBuffer.wrap(buf);
-                            pbb.limit(length);
-                            Packet rec = new Packet(pbb);
-                            Log.debug("SCTP message parsed\n" + rec.toString());
-                            deal(rec);
+                            length = _transp.receive(buf, 0, buf.length, TICK);
+                            if (length > 0) {
+                                String b = Packet.getHex(buf, length);
+                                Log.verb("DTLS message recieved\n" + b.toString());
+                                ByteBuffer pbb = ByteBuffer.wrap(buf);
+                                ((Buffer) pbb).limit(length);
+                                Packet rec = new Packet(pbb);
+                                Log.debug("SCTP message parsed\n" + rec.toString());
+                                deal(rec);
+                            } else {
+                                Log.verb("Timeout -> short packet " + length);
+                                //_rcv = null;
+                            }
                         } catch (java.io.InterruptedIOException iox) {
                             ;// ignore. it should be a timeout.
                             Log.verb("tick time out");
@@ -255,10 +267,15 @@ abstract public class Association {
 
                 } catch (java.io.EOFException eof) {
                     unexpectedClose(eof);
+                } catch (IllegalArgumentException iex) {
+                    Log.warn("Exception " + iex.getMessage());
+                    Log.warn("Buffer Length was invalid " + length);
                 } catch (Exception ex) {
                     Log.debug("Association rcv failed " + ex.getClass().getName() + " " + ex.getMessage());
                     ex.printStackTrace();
+
                 }
+
             }
         };
         _rcv = new Thread(r);
@@ -268,9 +285,9 @@ abstract public class Association {
     }
 
     public Association(DatagramTransport transport, AssociationListener al) {
-        this( transport,  al, false); // default is server
+        this(transport, al, false); // default is server
     }
-    
+
     public Association(DatagramTransport transport, AssociationListener al, boolean client) {
         //Log.setLevel(Log.ALL);
         Log.debug("Created an Associaction of type: " + this.getClass().getSimpleName());
@@ -308,6 +325,12 @@ abstract public class Association {
      */
     public boolean doBidirectionalInit() {
         return true;
+    }
+
+    public void sendHeartBeat() throws Exception {
+        Chunk[] dub = new Chunk[1];
+        dub[0] = new HeartBeatChunk();
+        send(dub);
     }
 
     protected void send(Chunk c[]) throws SctpPacketFormatException, IOException {
@@ -393,12 +416,15 @@ abstract public class Association {
                 reply = dataDeal((DataChunk) c);
                 break;
             case Chunk.ABORT:
-                // no reply we should just bail I think.
-                _rcv = null;
-                _transp.close();
+                unexpectedClose(new EOFException("ABORT received"));
+                oldState = _state; // prevent either of the statechange if's happenin
+                // by this point, it is _all_ over! 
+                ret = false;
                 break;
             case Chunk.HEARTBEAT:
+                Log.debug("got heartbeat " + c.toString());
                 reply = ((HeartBeatChunk) c).mkReply();
+                Log.debug("sending " + reply[0].typeLookup());
                 break;
             case Chunk.SACK:
                 Log.debug("got tsak for TSN " + ((SackChunk) c).getCumuTSNAck());
@@ -421,10 +447,11 @@ abstract public class Association {
             if (null != _al) {
                 _al.onAssociated(this);
             }
-            reconfigState = new ReconfigState(this,_farTSN);
+            reconfigState = new ReconfigState(this, _farTSN);
 
         }
         if ((oldState == State.ESTABLISHED) && (_state != State.ESTABLISHED)) {
+            closeAllStreams();
             if (null != _al) {
                 _al.onDisAssociated(this);
             }
@@ -625,7 +652,9 @@ abstract public class Association {
         SCTPStream in = _streams.get(sno);
         if (in == null) {
             in = mkStream(sno);
-            _streams.put(sno, in);
+            synchronized (_streams) {
+                _streams.put(sno, in);
+            }
             _al.onRawStream(in);
         }
         Chunk[] repa;
@@ -636,7 +665,7 @@ abstract public class Association {
             // _however_ this should be in behave -as mentioned above.
             try {
                 _al.onDCEPStream(in, in.getLabel(), dc.getPpid());
-            } catch (Exception x){
+            } catch (Exception x) {
                 closer = in.immediateClose();
             }
         } else {
@@ -648,7 +677,7 @@ abstract public class Association {
                 rep.add(r);
             }
         }
-        if (closer != null ){
+        if (closer != null) {
             rep.add(closer);
         }
         in.inbound(dc);
@@ -730,6 +759,10 @@ abstract public class Association {
                 int seqOut = s.getNextMessageSeqOut();
                 s.setNextMessageSeqOut(seqOut + 1);
             }
+            SCTPStreamListener l = s.getSCTPStreamListener();
+            if ((l != null) && (l instanceof SCTPOutboundStreamOpenedListener)) {
+                ((SCTPOutboundStreamOpenedListener) l).opened(s);
+            }
         }
         return rep;
     }
@@ -773,13 +806,16 @@ abstract public class Association {
      */
     private Chunk[] cookieEchoDeal(CookieEchoChunk echo) {
         Chunk[] reply = new Chunk[0];
-        if (_state == State.CLOSED || _state == State.COOKIEWAIT || _state == State.COOKIEECHOED) {
+        if (_state == State.CLOSED || _state == State.COOKIEWAIT || _state == State.COOKIEECHOED || _state == State.ESTABLISHED) {
             // Authenticate the State Cookie
             CookieHolder cookie;
             if (null != (cookie = checkCookieEcho(echo.getCookieData()))) {
                 // Compare the creation timestamp in the State Cookie to the current local time.
                 long howStale = howStaleIsMyCookie(cookie);
                 if (howStale == 0) {
+                    if (_state == State.ESTABLISHED) {
+                        Log.debug("Repeating a lost cookie Ack");
+                    }
                     //enter the ESTABLISHED state
                     _state = State.ESTABLISHED;
                     /*
@@ -807,7 +843,7 @@ abstract public class Association {
             }
 
         } else {
-            Log.debug("Got an COOKIE_ECHO when not closed - ignoring it");
+            Log.debug("Got an COOKIE_ECHO when not expecting one - ignoring it");
         }
         return reply;
     }
@@ -825,8 +861,10 @@ abstract public class Association {
 
     private int calcStashCap() {
         int ret = 0;
-        for (SCTPStream s : this._streams.values()) {
-            ret += s.stashCap();
+        synchronized (_streams) {
+            for (SCTPStream s : this._streams.values()) {
+                ret += s.stashCap();
+            }
         }
         return ret;
     }
@@ -835,54 +873,71 @@ abstract public class Association {
 
     public abstract SCTPStream mkStream(int id);
 
-
     long getCumAckPt() {
         return _farTSN;
     }
+
     ReConfigChunk addToCloseList(SCTPStream st) throws Exception {
         return reconfigState.makeClose(st);
     }
 
-    public void closeStream(SCTPStream st) throws SctpPacketFormatException, IOException, Exception{
-        Chunk []cs = new Chunk[1];
-        if (canSend()){
-            Log.debug("due to reconfig stream "+st);
+    public void closeStream(SCTPStream st) throws SctpPacketFormatException, IOException, Exception {
+        Chunk[] cs = new Chunk[1];
+        if (canSend()) {
+            Log.debug("due to reconfig stream " + st);
             cs[0] = reconfigState.makeClose(st);
+            this.send(cs);
         }
-        this.send(cs);
     }
 
-    
+    public SCTPStream mkStream(String label, SCTPStreamListener sl) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
+        SCTPStream s = mkStream(label);
+        s.setSCTPStreamListener(sl);
+        return s;
+    }
+
     public SCTPStream mkStream(String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
         int n = 1;
         int tries = this._maxOutStreams;
-        do {
-            n = 2*_random.nextInt(this._maxOutStreams);
-            if (!_even) n+=1;
-            if (--tries < 0) {
-                throw new StreamNumberInUseException();
-            }
-        } while (_streams.containsKey(new Integer(n)));
+        synchronized (_streams) {
+            do {
+                n = 2 * _random.nextInt(this._maxOutStreams/2);
+                if (!_even) {
+                    n += 1;
+                }
+                if (--tries < 0) {
+                    throw new StreamNumberInUseException();
+                }
+            } while (_streams.containsKey(new Integer(n)));
+        }
         return mkStream(n, label);
     }
 
     int[] allStreams() {
-        Set<Integer> ks = _streams.keySet();
-        int[] ret = new int[ks.size()];
-        int i = 0;
-        for (Integer k : ks) {
-            ret[i++] = k;
+        int[] ret = new int[0];
+        synchronized (_streams) {
+            Set<Integer> ks = _streams.keySet();
+            ret = new int[ks.size()];
+            int i = 0;
+            for (Integer k : ks) {
+                ret[i++] = k;
+            }
         }
         return ret;
     }
+
     protected SCTPStream getStream(int s) {
-        return _streams.get(s);
+        synchronized (_streams) {
+            return _streams.get(s);
+        }
     }
 
     SCTPStream delStream(int s) {
-        return _streams.remove(s);
+        synchronized (_streams) {
+            return _streams.remove(s);
+        }
     }
-    
+
     public SCTPStream mkStream(int sno, String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
         SCTPStream sout;
         if (canSend()) {
@@ -897,6 +952,7 @@ abstract public class Association {
             }// todo - move this to behave
             DataChunk dcopen = DataChunk.mkDCOpen(label);
             sout.outbound(dcopen);
+            //sout.setNextMessageSeqOut(1);
             dcopen.setTsn(_nearTSN++);
             Chunk[] hack = {dcopen};
             try {
@@ -911,7 +967,11 @@ abstract public class Association {
     }
 
     public int maxMessageSize() {
-        return 1 << 20; // shrug - I don't know 
+        return 1 << 16; // shrug - I don't know 
+    }
+
+    public State getState() {
+        return _state;
     }
 
     public boolean canSend() {
@@ -928,10 +988,44 @@ abstract public class Association {
         return ok;
     }
 
-    protected void unexpectedClose(EOFException end) {
-        _rcv = null;
-        _al.onDisAssociated(this);
+    public void unexpectedClose(EOFException end) {
+        Log.debug("Unxepected association close " + end.getMessage());
+        try {
+            closeAllStreams();
+            _al.onDisAssociated(this);
+        } catch (Throwable t) {
+            Log.error("Threw " + t.getMessage() + " in unexpectedClose");
+            if (Log.getLevel() >= Log.DEBUG) {
+                t.printStackTrace();
+            }
+        }
         _state = State.CLOSED;
+        _rcv = null;
+
+    }
+
+    public void closeAllStreams() {
+        synchronized (_streams) {
+            _streams.forEach((Integer sn, SCTPStream st) -> {
+                Log.debug("closing " + st.getLabel());
+                try {
+                    SCTPStreamListener li = st.getSCTPStreamListener();
+                    if (li != null) {
+                        li.close(st);
+                    }
+                } catch (Exception x) {
+                    Log.error("problem closing stream");
+                    if (Log.getLevel() >= Log.DEBUG) {
+                        x.printStackTrace();
+                    }
+                }
+            });
+            _streams.clear();
+        }
+    }
+
+    public boolean isAssociated() {
+        return _state == State.ESTABLISHED;
     }
 
     abstract public void sendAndBlock(SCTPMessage m) throws Exception;

@@ -16,16 +16,13 @@
  */
 package pe.pi.sctp4j.sctp;
 
-import pe.pi.sctp4j.sctp.Association;
-import pe.pi.sctp4j.sctp.SCTPMessage;
-import pe.pi.sctp4j.sctp.SCTPStream;
 import pe.pi.sctp4j.sctp.messages.*;
 import pe.pi.sctp4j.sctp.messages.exceptions.SctpPacketFormatException;
 import pe.pi.sctp4j.sctp.small.BlockingSCTPStream;
 import java.io.IOException;
 import java.util.Random;
 import java.util.TreeSet;
-import org.bouncycastle.crypto.tls.DatagramTransport;
+import org.bouncycastle.tls.DatagramTransport;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;

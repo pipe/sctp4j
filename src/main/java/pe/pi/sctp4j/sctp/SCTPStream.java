@@ -66,6 +66,19 @@ public abstract class SCTPStream {
 
     abstract public void delivered(DataChunk d);
 
+    public SCTPStreamListener getSCTPStreamListener() {
+        return _sl;
+    }
+
+    public String toString() {
+        return this.getClass().getSimpleName() 
+                + "[" + this._sno + "]"
+                + "=" + this._label
+                + "|"+_behave.getClass().getSimpleName()+"|"
+                +"->"
+                + ((_sl != null) ? _sl.getClass().getSimpleName() : "null");
+    }
+
     enum State {
         CLOSED, INBOUNDONLY, OUTBOUNDONLY, OPEN
     }
@@ -85,9 +98,6 @@ public abstract class SCTPStream {
         return new Integer(_sno);
     }
 
-    public String toString() {
-        return "Stream (" + _sno + ") label:" + _label + " state:" + state + " behave:" + _behave.getClass().getSimpleName();
-    }
 
     public Chunk[] append(DataChunk dc) {
         Log.debug("adding data to stash on stream " + _label + "(" + dc + ")");
@@ -179,7 +189,6 @@ public abstract class SCTPStream {
     }
 
     void reset() {
-
         Log.debug("Resetting stream " + this._sno);
         if (this._sl != null) {
             _sl.close(this);

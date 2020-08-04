@@ -16,8 +16,6 @@
  */
 package pe.pi.sctp4j.sctp.small;
 
-import pe.pi.sctp4j.sctp.small.BlockingSCTPStream;
-import pe.pi.sctp4j.sctp.small.ThreadedAssociation;
 import pe.pi.sctp4j.sctp.Association;
 import pe.pi.sctp4j.sctp.AssociationListener;
 import pe.pi.sctp4j.sctp.SCTPByteStreamListener;
@@ -32,7 +30,7 @@ import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import org.bouncycastle.crypto.tls.DatagramTransport;
+import org.bouncycastle.tls.DatagramTransport;
 import org.junit.After;
 import org.junit.AfterClass;
 import org.junit.Before;
@@ -437,6 +435,7 @@ public class ThreadedAssociationTest {
      */
     @Test
     public void testDCEPStreamSend() throws Exception {
+        //Log.setLevel(Log.VERB);
         System.out.println("---->testDCEPStreamSend string");
 
         final StringBuffer rightout = new StringBuffer();
@@ -482,7 +481,7 @@ public class ThreadedAssociationTest {
         assert (s instanceof BlockingSCTPStream);
         BlockingSCTPStream bs = (BlockingSCTPStream) s;
         StringBuffer longTestMessage = new StringBuffer();
-        for (int i = 0; i < 10000; i++) {
+        for (int i = 0; i < 10; i++) {
             longTestMessage.append(" " + i);
         }
         final String testString = longTestMessage.toString();

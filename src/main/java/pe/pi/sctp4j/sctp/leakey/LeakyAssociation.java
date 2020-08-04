@@ -18,7 +18,7 @@ package pe.pi.sctp4j.sctp.leakey;
 
 import pe.pi.sctp4j.sctp.AssociationListener;
 import pe.pi.sctp4j.sctp.small.ThreadedAssociation;
-import org.bouncycastle.crypto.tls.DatagramTransport;
+import org.bouncycastle.tls.DatagramTransport;
 
 /**
  *

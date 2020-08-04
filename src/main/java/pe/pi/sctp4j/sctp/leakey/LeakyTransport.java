@@ -22,7 +22,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import org.bouncycastle.crypto.tls.DatagramTransport;
+import org.bouncycastle.tls.DatagramTransport;
 
 /**
  *
@@ -38,12 +38,12 @@ class LeakyTransport implements DatagramTransport {
     DatagramTransport _dtls;
     DatagramSocket _logrec;
     DatagramSocket _logsend;
-    final static short SCTP = 9899;
+    static short SCTP = 9800;
 
     public LeakyTransport(DatagramTransport transport) {
+        InetAddress me = java.net.Inet4Address.getLoopbackAddress();
         try {
             _dtls = transport;
-            InetAddress me = InetAddress.getLocalHost();
             _logrec = new DatagramSocket(SCTP, me);
             _logsend = new DatagramSocket(SCTP + 1, me);
 
@@ -52,8 +52,9 @@ class LeakyTransport implements DatagramTransport {
             InetSocketAddress r = (InetSocketAddress) _logrec.getLocalSocketAddress();
             Log.warn("Leaking to recv address " + r.getHostString() + ":" + r.getPort());
         } catch (Exception ex) {
-            Log.error("exception in making Leaky socket");
+            Log.error("exception in making Leaky socket "+SCTP+" loopback "+me);
         }
+        SCTP +=10;
     }
 
     @Override

@@ -22,6 +22,7 @@ import pe.pi.sctp4j.sctp.messages.exceptions.ChecksumException;
 import pe.pi.sctp4j.sctp.messages.exceptions.InvalidSCTPPacketException;
 import pe.pi.sctp4j.sctp.messages.exceptions.SctpPacketFormatException;
 import com.phono.srtplight.Log;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -97,7 +98,8 @@ public class Packet {
         }
         /*Log.verb("un padding by " + pad);
         ret.position(ret.position() - pad);*/
-        ret = (ByteBuffer) ret.flip();
+        
+        ret = (ByteBuffer) ((Buffer)ret).flip();
         setChecksum(ret);
         return ret;
     }

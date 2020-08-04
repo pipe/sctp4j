@@ -118,9 +118,9 @@ class ReconfigState {
                     for (int s : streams) {
                         SCTPStream cstrm = assoc.delStream(s);
                         if (cstrm == null) {
-                            Log.error("Close a non existant stream");
-                            rep.setResult(rep.ERROR_WRONG_SSN);
-                            break;
+                            Log.error("(re)Close a non existant stream ="+s);
+                            //rep.setResult(rep.ERROR_WRONG_SSN);
+                            //break;
                             // bidriectional might be a problem here...
                         } else {
                             cstrm.reset();

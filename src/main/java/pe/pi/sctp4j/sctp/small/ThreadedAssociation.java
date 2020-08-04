@@ -29,7 +29,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
-import org.bouncycastle.crypto.tls.DatagramTransport;
+import org.bouncycastle.tls.DatagramTransport;
 
 /**
  * An association who's retries etc are managed with plain old threads.
@@ -38,7 +38,7 @@ import org.bouncycastle.crypto.tls.DatagramTransport;
  */
 public class ThreadedAssociation extends Association implements Runnable {
 
-    final static int MAXBLOCKS = 10; // some number....
+    final static int MAXBLOCKS = 100; // some number....
     private ArrayBlockingQueue<DataChunk> _freeBlocks;
     private HashMap<Long, DataChunk> _inFlight;
     private long _lastCumuTSNAck;

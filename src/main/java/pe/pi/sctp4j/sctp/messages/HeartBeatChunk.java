@@ -16,6 +16,7 @@
  */
 package pe.pi.sctp4j.sctp.messages;
 
+import com.phono.srtplight.Log;
 import pe.pi.sctp4j.sctp.messages.exceptions.SctpPacketFormatException;
 import pe.pi.sctp4j.sctp.messages.params.VariableParam;
 import java.nio.ByteBuffer;
@@ -26,6 +27,16 @@ import java.nio.ByteBuffer;
  */
 public class HeartBeatChunk extends Chunk {
 
+    public HeartBeatChunk() throws SctpPacketFormatException {
+        super((byte) HEARTBEAT);
+        HeartbeatInfo req = new HeartbeatInfo(1, "HeartbeatInfo");
+        String t = ""+ System.currentTimeMillis();
+        req.setData(t.getBytes());
+        Log.debug("adding "+req+" to "+this);
+        _varList.add(req);
+        validate();
+    }
+
     public HeartBeatChunk(byte type, byte flags, int length, ByteBuffer pkt) {
         super(type, flags, length, pkt);
         if (_body.remaining() >= 4) {
@@ -35,25 +46,27 @@ public class HeartBeatChunk extends Chunk {
             }
         }
     }
+
     @Override
-    public void validate() throws SctpPacketFormatException{
+    public void validate() throws SctpPacketFormatException {
         VariableParam hbd;
         if ((_varList == null) || (_varList.size() != 1)) {
             throw new SctpPacketFormatException("No (or too much content in this heartbeat packet");
         }
         hbd = _varList.get(0);
-        if (!(hbd instanceof HeartbeatInfo)){
+        if (!(hbd instanceof HeartbeatInfo)) {
             throw new SctpPacketFormatException("Expected a heartbeatinfo in this packet");
         }
     }
-    
-    public Chunk[] mkReply(){
+
+    public Chunk[] mkReply() {
         Chunk[] rep = new Chunk[1];
         HeartBeatAckChunk dub = new HeartBeatAckChunk();
         dub._varList = this._varList;
         rep[0] = dub;
         return rep;
     }
+
     @Override
     void putFixedParams(ByteBuffer ret) {
         // none

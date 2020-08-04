@@ -4,7 +4,7 @@ This is a pure java implementation of the SCTP protocol.
 The target usecase is small devices that want to run the webRTC datachannel.
 
 This implementation does not include all the necessary parts for a full 
-webRTC stack. You'll need DTLS (we use Bouncy Castle) and ICE/STUN/TURN (you can use Jitsi's ice4j).
+webRTC stack. You'll need DTLS (we use Bouncy Castle) and ICE/STUN/TURN (you can use Jitsi's ice4j or our slice ).
 
 This implementation assumes that datagrams will arrive from an DTLS/ICE stack
 which implements a Datagram Transport. It also assumes a consumer of open SCTP Streams (or datachannels) - it is pure middleware.
