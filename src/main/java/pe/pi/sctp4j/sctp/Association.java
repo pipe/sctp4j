@@ -911,7 +911,7 @@ abstract public class Association {
     }
 
     public int maxMessageSize() {
-        return 1 << 16; // shrug - I don't know 
+        return 1 << 20; // shrug - I don't know 
     }
 
     public boolean canSend() {
