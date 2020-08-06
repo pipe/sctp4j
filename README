@@ -9,11 +9,32 @@ webRTC stack. You'll need DTLS (we use Bouncy Castle) and ICE/STUN/TURN (you can
 This implementation assumes that datagrams will arrive from an DTLS/ICE stack
 which implements a Datagram Transport. It also assumes a consumer of open SCTP Streams (or datachannels) - it is pure middleware.
 
+Brief note on how to drive it:
+
+Once you have a BouncyCastle DTLS transport open to a WebRTC agent you can:
+
+                    public Association makeAssociation(DTLSTransport trans, AssociationListener li) {
+                        a = new ThreadedAssociation(trans, li);
+                    }
+The associationListener will fire events when an association is made and when inbound dataChannels are created.
+                    SCTPStreamListener sl; 
+                    // create a streamListener here
+                    SCTPStream echo = a.mkStream("echo", sl);
+Will create an outbound stream labeled 'echo';
+
+Background:
+
 The stack tries to keep the details of concurrency in a single package, so that the current pure thread model could be replaced with Akka actors or NIO-like async mechanisms.
 
 This implementation works well on small devices (eg Raspberry Pi, C.H.I.P etc)
 
 Thanks to Michael Tüxen (@tuexen) for help and advice
 Thanks to Emil Ivov (@Emcho) for Ice4J and encouragement.
+
+Some context on the long silence, we hurried a release out as opensource at the request of some friends,
+in the end they didn't adopt the release, so it got substantially sidelined whilst I worked on the rest of the |pipe| stack.
+I've now circled back and am attempting to make this a viable public project. Sorry for the delay.
+
+
 
 
