@@ -4,7 +4,7 @@
 
     <groupId>pe.pi</groupId>
     <artifactId>sctp4j</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.2.8</version>
     <packaging>jar</packaging>
 
     <name>sctp4j</name>
@@ -32,7 +32,7 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bcprov-jdk15on</artifactId>
-            <version>1.62</version>
+            <version>1.68</version>
         </dependency>
         <dependency>
             <groupId>org.glassfish</groupId>
@@ -42,7 +42,7 @@
         <dependency>
             <groupId>org.bouncycastle</groupId>
             <artifactId>bctls-jdk15on</artifactId>
-            <version>1.62</version>
+            <version>1.68</version>
         </dependency>
         <dependency>
             <groupId>junit</groupId>
