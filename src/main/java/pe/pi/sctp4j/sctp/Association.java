@@ -33,6 +33,7 @@ import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -461,11 +462,21 @@ abstract public class Association {
 
     ByteBuffer mkPkt(Chunk[] cs) throws SctpPacketFormatException {
         Packet ob = new Packet(_srcPort, _destPort, _peerVerTag);
-        for (Chunk r : cs) {
-            Log.debug("adding chunk to outbound packet " + r.toString());
-            ob.getChunkList().add(r);
-            //todo - this needs to workout if all the chunks will fit...
-        }
+        // cookie ACKs _must_ come before data or sacks
+        Arrays.asList(cs).stream()
+                .filter((Chunk c) -> {return c.getType() == Chunk.COOKIE_ACK; })
+                .forEach((Chunk r) -> {
+                    Log.debug("adding Cookie Ack chunk to outbound packet " + r.toString());
+                    ob.getChunkList().add(r);
+                }
+        );
+        Arrays.asList(cs).stream()
+                .filter((Chunk c) -> {return c.getType() != Chunk.COOKIE_ACK; })
+                .forEach((Chunk r) -> {
+                    Log.debug("adding normal chunk to outbound packet " + r.toString());
+                    ob.getChunkList().add(r);
+                }
+        );
         ByteBuffer obb = ob.getByteBuffer();
         return obb;
     }
