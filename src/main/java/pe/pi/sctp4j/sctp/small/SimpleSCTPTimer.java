@@ -14,34 +14,55 @@
  * limitations under the License.
  *
  */
-
 package pe.pi.sctp4j.sctp.small;
 
+import com.phono.srtplight.Log;
 import java.util.Timer;
 import java.util.TimerTask;
-import pe.pi.sctp4j.sctp.SCTPTimer;
 
 /**
  *
- * @author tim
- * Assumption is that timers _always_ go off - it is up to the 
- * runnable to decide if something needs to be done or not.
+ * @author tim Only one queued invocation. New requests replace queued ones if
+ * they are earlier.
  */
-class SimpleSCTPTimer implements SCTPTimer {
-    protected  static Timer _timer = new Timer("SCTPTimer",true); 
-    static int tno = 1;
+abstract class SimpleSCTPTimer {
     
-
-    @Override
-    public void setRunnable(Runnable r, long at) {
-        TimerTask tt = new TimerTask(){
-            @Override
-            public void run() {
-                r.run();
+    protected static Timer _timer = new Timer("SCTPTimer", true);
+    static int tno = 1;
+    long scheduledAt = Long.MAX_VALUE;
+    TimerTask task = null;
+    
+    public abstract void tick();
+    
+    public void setNextRun(long by) {
+        long now = System.currentTimeMillis();
+        long when = now + by;
+        if (when < scheduledAt) {
+            if (task != null) {
+                task.cancel();
+                Log.verb("cancelled future task scheduled for " + scheduledAt + " because new task at " + when);
             }
-            
-        };
-        _timer.schedule(tt, at);
+            task = new TimerTask() {
+                @Override
+                public void run() {
+                    try {
+                        Log.verb("running task");
+                        tick();
+                        scheduledAt = Long.MAX_VALUE;
+                    } catch (Throwable t) {
+                        Log.error("SCTPTimerTask threw Exception " + t);
+                        if (Log.getLevel() >= Log.DEBUG) {
+                            t.printStackTrace();
+                        }
+                    }
+                }
+            };
+            _timer.schedule(task, by);
+            Log.verb("SCTPTimer task now scheduled at " + when);
+            scheduledAt = when;
+        } else {
+            Log.verb ("already have a task scheduled for "+scheduledAt+" which is earlier than "+when);
+        }
     }
     
 }

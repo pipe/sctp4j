@@ -33,6 +33,7 @@ public class SCTPMessage implements Runnable {
     private int _mseq; // note do we need these ?
     private SCTPStreamListener _li;
     private boolean _delivered;
+    private Runnable onAcked;
 
     /**
      * Outbound message - note that we assume no one will mess with data between
@@ -180,8 +181,13 @@ public class SCTPMessage implements Runnable {
             Log.debug("Undelivered message to " + (_stream == null ? "null stream" : _stream.getLabel()) + " via " + (_li == null ? "null listener" : _li.getClass().getSimpleName()) + " ppid is " + _pPid);
         }
     }
-
+    public void setAckCallBack(Runnable r){
+        onAcked = r;
+    }
     public void acked() {
+        if (onAcked != null){
+            onAcked.run();
+        }
     }
 
 }

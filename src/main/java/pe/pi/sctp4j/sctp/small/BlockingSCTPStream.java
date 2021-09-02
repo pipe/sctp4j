@@ -43,6 +43,7 @@ public class BlockingSCTPStream extends SCTPStream {
         Association a = super.getAssociation();
         SCTPMessage m = a.makeMessage(message, this);
         if (m != null){
+            undeliveredOutboundMessages.put(m.getSeq(),m);
             a.sendAndBlock(m);
         }
     }

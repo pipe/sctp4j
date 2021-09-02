@@ -133,7 +133,9 @@ public class ThreadedAssociation extends Association implements Runnable {
     private final double _rtoBeta = 0.2500;
     private final double _rtoAlpha = 0.1250;
     private final double _rtoMin = 1.0;
-    private final double _rtoMax = 60.0;
+    private final double _rtoMax = 6.0;
+    private long t1 = 10000; // first guess
+    private long t3 = 3000; // ditto.
 
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
         super(transport, al);
@@ -151,7 +153,12 @@ public class ThreadedAssociation extends Association implements Runnable {
             _freeBlocks.add(dc);
         }
         resetCwnd();
-        _timer = new SimpleSCTPTimer();
+        _timer = new SimpleSCTPTimer(){
+            @Override
+            public void tick() {
+                run();
+            }
+        };
 
     }
     /*
@@ -175,13 +182,10 @@ public class ThreadedAssociation extends Association implements Runnable {
 
     @Override
     public void associate() throws SctpPacketFormatException, IOException {
-        final SimpleSCTPTimer init = new SimpleSCTPTimer();
-        sendInit();
-        Runnable r = new Runnable() {
+        final SimpleSCTPTimer init = new SimpleSCTPTimer(){
             int retries = 0;
-
             @Override
-            public void run() {
+            public void tick() {
                 Log.debug("T1 init timer expired in state " + _state.name());
 
                 if ((_state == State.COOKIEECHOED) || (_state == State.COOKIEWAIT)) {
@@ -198,14 +202,15 @@ public class ThreadedAssociation extends Association implements Runnable {
                     }
                     retries++;
                     if (retries < MAX_INIT_RETRANS) {
-                        init.setRunnable(this, getT1());
+                        this.setNextRun(getT1());
                     }
                 } else {
                     Log.debug("T1 init timer expired with nothing to do");
                 }
             }
         };
-        init.setRunnable(r, getT1());
+        sendInit();
+        init.setNextRun(getT1());
     }
 
     public SCTPStream mkStream(int id) {
@@ -214,7 +219,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     }
 
     public long getT3() {
-        return (_rto > 0) ? (long) (1000.0 * _rto): 100;
+        return t3;
     }
 
     @Override
@@ -228,7 +233,7 @@ public class ThreadedAssociation extends Association implements Runnable {
             d.setGapAck(false);
             d.setRetryTime(now + getT3() - 1);
             d.setSentTime(now);
-            _timer.setRunnable(this, getT3());
+            _timer.setNextRun(getT3());
             reduceRwnd(d.getDataSize());
             //_outbound.put(new Long(d.getTsn()), d);
             Log.verb(" DataChunk enqueued " + d.toString());
@@ -703,7 +708,7 @@ public class ThreadedAssociation extends Association implements Runnable {
             Log.verb("retry timer went off at " + now);
             ArrayList<DataChunk> dcs = new ArrayList();
             int space = _transpMTU - 12; // room for packet header
-            boolean resetTimer = false;
+            boolean resetTimer = true; // assume we come back - unless we had an exception
             synchronized (_inFlight) {
                 for (Long k : _inFlight.keySet()) {
                     DataChunk d = _inFlight.get(k);
@@ -715,15 +720,15 @@ public class ThreadedAssociation extends Association implements Runnable {
                         space -= d.getChunkLength();
                         Log.debug("available space in pkt is " + space);
                         if (space <= 0) {
-                            resetTimer = true;
+                            Log.verb("no room, come back later " + d.toString());
                             break;
                         } else {
+                            Log.verb("adding this to resend list " + d.toString());
                             dcs.add(d);
                             d.setRetryTime(now + getT3() - 1);
                         }
                     } else {
                         Log.verb("retry not yet due for  " + d.toString());
-                        resetTimer = true;
                     }
                 }
             }
@@ -753,15 +758,14 @@ public class ThreadedAssociation extends Association implements Runnable {
                 Log.verb("Nothing to do ");
             }
             if (resetTimer) {
-                _timer.setRunnable(this, getT3());
+                _timer.setNextRun(getT3());
                 Log.verb("Try again in a while  "+getT3());
-
             }
         }
     }
 
     private long getT1() {
-        return (long) (_rto * 1000) * 10;
+        return   t1;
     }
 
     /*
@@ -830,6 +834,10 @@ public class ThreadedAssociation extends Association implements Runnable {
             _rto = nrto;
         }
         Log.debug("new rto is " + _rto);
+        t1 = (long)(_rto * 1000) * 10;
+        Log.debug("T1 is now "+t1+" ms");
+        t3 = (_rto > 0.0) ? (long) (1000.0 * _rto): 100;
+        Log.debug("T3 is now "+t3+" ms");
         /*
 
 
