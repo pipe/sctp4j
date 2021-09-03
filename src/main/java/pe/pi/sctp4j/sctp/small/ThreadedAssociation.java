@@ -23,6 +23,7 @@ import pe.pi.sctp4j.sctp.SCTPStream;
 import pe.pi.sctp4j.sctp.messages.*;
 import pe.pi.sctp4j.sctp.messages.exceptions.SctpPacketFormatException;
 import com.phono.srtplight.Log;
+import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -114,7 +115,7 @@ public class ThreadedAssociation extends Association implements Runnable {
      To do .....
      */
     private int _transpMTU = 768;
-    private final SimpleSCTPTimer _timer;
+    private Thread retryThread;
     private Chunk[] _stashCookieEcho;
     private final Object _congestion = new Object();
     private boolean _firstRTT = true;
@@ -132,10 +133,10 @@ public class ThreadedAssociation extends Association implements Runnable {
      */
     private final double _rtoBeta = 0.2500;
     private final double _rtoAlpha = 0.1250;
-    private final double _rtoMin = 1.0;
+    private final double _rtoMin = 0.01;
     private final double _rtoMax = 6.0;
-    private long t1 = 10000; // first guess
-    private long t3 = 3000; // ditto.
+    private long t1 = 1000; // first guess
+    private long t3 = 300; // ditto.
 
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
         super(transport, al);
@@ -153,14 +154,10 @@ public class ThreadedAssociation extends Association implements Runnable {
             _freeBlocks.add(dc);
         }
         resetCwnd();
-        _timer = new SimpleSCTPTimer(){
-            @Override
-            public void tick() {
-                run();
-            }
-        };
-
+        retryThread = new Thread(this, "SCTPTimer" + this.getPeerId());
+        retryThread.start();
     }
+
     /*
      If the T1-init timer expires at "A" after the INIT or COOKIE ECHO
      chunks are sent, the same INIT or COOKIE ECHO chunk with the same
@@ -172,7 +169,6 @@ public class ThreadedAssociation extends Association implements Runnable {
      When retransmitting the INIT, the endpoint MUST follow the rules
      defined in Section 6.3 to determine the proper timer value.
      */
-
     @Override
     protected Chunk[] iackDeal(InitAckChunk iack) {
         Chunk[] ret = super.iackDeal(iack);
@@ -182,8 +178,9 @@ public class ThreadedAssociation extends Association implements Runnable {
 
     @Override
     public void associate() throws SctpPacketFormatException, IOException {
-        final SimpleSCTPTimer init = new SimpleSCTPTimer(){
+        final SimpleSCTPTimer init = new SimpleSCTPTimer() {
             int retries = 0;
+
             @Override
             public void tick() {
                 Log.debug("T1 init timer expired in state " + _state.name());
@@ -233,7 +230,6 @@ public class ThreadedAssociation extends Association implements Runnable {
             d.setGapAck(false);
             d.setRetryTime(now + getT3() - 1);
             d.setSentTime(now);
-            _timer.setNextRun(getT3());
             reduceRwnd(d.getDataSize());
             //_outbound.put(new Long(d.getTsn()), d);
             Log.verb(" DataChunk enqueued " + d.toString());
@@ -264,6 +260,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     public void sendAndBlock(SCTPMessage m) throws Exception {
         while (m.hasMoreData()) {
             DataChunk dc = _freeBlocks.take();
+            dc.clean();
             m.fill(dc);
             Log.verb("thinking about waiting for congestion " + dc.getTsn());
 
@@ -307,7 +304,7 @@ public class ThreadedAssociation extends Association implements Runnable {
                     m.setSeq(mseq);
                 }
             } else {
-                Log.warn("Message too long "+bytes.length() +" > "+this.maxMessageSize());
+                Log.warn("Message too long " + bytes.length() + " > " + this.maxMessageSize());
             }
         }
         return m;
@@ -369,28 +366,32 @@ public class ThreadedAssociation extends Association implements Runnable {
      using the a_rwnd value, the Cumulative TSN Ack, and Gap Ack Blocks in
      a received SACK.
      */
-    /*
+ /*
      A) At the establishment of the association, the endpoint initializes
      the rwnd to the Advertised Receiver Window Credit (a_rwnd) the
      peer specified in the INIT or INIT ACK.
      */
     protected Chunk[] inboundInit(InitChunk init) {
         _rwnd = init.getAdRecWinCredit();
+        Log.debug("Inited rwnd to " + _rwnd);
+
         setSsthresh(init);
         return super.inboundInit(init);
     }
+
     /*
      B) Any time a DATA chunk is transmitted (or retransmitted) to a peer,
      the endpoint subtracts the data size of the chunk from the rwnd of
      that peer.
      */
-
     private void reduceRwnd(int dataSize) {
         _rwnd -= dataSize;
         if (_rwnd < 0) {
             _rwnd = 0;
         }
+        Log.debug("Decreased rwnd to " + _rwnd);
     }
+
     /*
      C) Any time a DATA chunk is marked for retransmission, either via
      T3-rtx timer expiration (Section 6.3.3) or via Fast Retransmit
@@ -400,10 +401,11 @@ public class ThreadedAssociation extends Association implements Runnable {
      chunk, then only DATA chunks whose timer expired would be marked
      for retransmission.
      */
-
     private void incrRwnd(int dataSize) {
         _rwnd += dataSize;
+        Log.debug("Increased rwnd to " + _rwnd);
     }
+
     /*
 
      D) Any time a SACK arrives, the endpoint performs the following:
@@ -425,7 +427,6 @@ public class ThreadedAssociation extends Association implements Runnable {
      Recovery exitpoint (Section 7.2.4), Fast Recovery is exited.
 
      */
-
     @Override
     protected Chunk[] sackDeal(SackChunk sack) {
         Chunk[] ret = {};
@@ -461,7 +462,9 @@ public class ThreadedAssociation extends Association implements Runnable {
                     try {
                         int sid = d.getStreamId();
                         SCTPStream stream = getStream(sid);
-                        if(stream != null) {stream.delivered(d);}
+                        if (stream != null) {
+                            stream.delivered(d);
+                        }
                         _freeBlocks.put(d);
                     } catch (InterruptedException ex) {
                         Log.error("eek - can't replace free block on list!?!");
@@ -512,7 +515,7 @@ public class ThreadedAssociation extends Association implements Runnable {
                 }
             }
             _rwnd = sack.getArWin() - totalDataInFlight;
-            Log.debug("Setting rwnd to " + _rwnd);
+            Log.debug("Setting rwnd to " + _rwnd+ " "+sack.getArWin() +" - "+ totalDataInFlight);
             boolean advanced = (_lastCumuTSNAck < ackedTo);
             adjustCwind(advanced, totalDataInFlight, totalAcked);
             _lastCumuTSNAck = ackedTo;
@@ -544,17 +547,18 @@ public class ThreadedAssociation extends Association implements Runnable {
             _congestion.notifyAll();
         }
     }
+
     /*
      o  The initial cwnd after a retransmission timeout MUST be no more
      than 1*MTU.
      */
-
     protected void setCwndPostRetrans() {
         _cwnd = _transpMTU;
         synchronized (_congestion) {
             _congestion.notifyAll();
         }
     }
+
     /*
     
 
@@ -562,7 +566,6 @@ public class ThreadedAssociation extends Association implements Runnable {
      example, implementations MAY use the size of the receiver
      advertised window).
      */
-
     void setSsthresh(InitChunk init) {
         this._ssthresh = init.getAdRecWinCredit();
     }
@@ -610,8 +613,7 @@ public class ThreadedAssociation extends Association implements Runnable {
                 Log.debug("cwnd static at " + _cwnd + " (didAdvance fullyUtilized  _fastRecovery inFlightBytes totalAcked)  " + didAdvance + " " + fullyUtilized + " " + _fastRecovery + " " + inFlightBytes + " " + totalAcked);
             }
 
-        } else {
-            /*
+        } else /*
              7.2.2.  Congestion Avoidance
 
              When cwnd is greater than ssthresh, cwnd should be incremented by
@@ -652,19 +654,18 @@ public class ThreadedAssociation extends Association implements Runnable {
              acknowledged by the receiver, partial_bytes_acked is initialized
              to 0.
 
-             */
-            if (didAdvance) {
-                _partial_bytes_acked += totalAcked;
-                if ((_partial_bytes_acked >= _cwnd) && fullyUtilized) {
-                    _cwnd += _transpMTU;
-                    _partial_bytes_acked -= _cwnd;
-                }
+         */ if (didAdvance) {
+            _partial_bytes_acked += totalAcked;
+            if ((_partial_bytes_acked >= _cwnd) && fullyUtilized) {
+                _cwnd += _transpMTU;
+                _partial_bytes_acked -= _cwnd;
             }
         }
         synchronized (_congestion) {
             _congestion.notifyAll();
         }
     }
+
     /*
      In instances where its peer endpoint is multi-homed, if an endpoint
      receives a SACK that advances its Cumulative TSN Ack Point, then it
@@ -699,73 +700,79 @@ public class ThreadedAssociation extends Association implements Runnable {
      max(cwnd/2, 4*MTU) per RTO.
 
      */
-
-    // timer goes off,
+    // resend loop - runs on it's own thread.
     @Override
     public void run() {
-        if (canSend()) {
+        Log.verb("starting retry thread");
+        while (retryThread != null) {
             long now = System.currentTimeMillis();
-            Log.verb("retry timer went off at " + now);
-            ArrayList<DataChunk> dcs = new ArrayList();
-            int space = _transpMTU - 12; // room for packet header
-            boolean resetTimer = true; // assume we come back - unless we had an exception
-            synchronized (_inFlight) {
-                for (Long k : _inFlight.keySet()) {
-                    DataChunk d = _inFlight.get(k);
-                    if (d.getGapAck()) {
-                        Log.verb("skipping gap-acked tsn " + d.getTsn());
-                        continue;
-                    }
-                    if (d.getRetryTime() <= now) {
-                        space -= d.getChunkLength();
-                        Log.debug("available space in pkt is " + space);
-                        if (space <= 0) {
-                            Log.verb("no room, come back later " + d.toString());
-                            break;
-                        } else {
-                            Log.verb("adding this to resend list " + d.toString());
-                            dcs.add(d);
-                            d.setRetryTime(now + getT3() - 1);
+            long nextTime = now + t3;
+            Log.verb("retry timer went off ");
+            if (canSend()) {
+                ArrayList<DataChunk> dcs = new ArrayList();
+                int space = _transpMTU - 12; // room for packet header
+                synchronized (_inFlight) {
+                    for (Long k : _inFlight.keySet()) {
+                        DataChunk d = _inFlight.get(k);
+                        if (d.getGapAck()) {
+                            Log.verb("skipping gap-acked tsn " + d.getTsn());
+                            continue;
                         }
-                    } else {
-                        Log.verb("retry not yet due for  " + d.toString());
+                        if (d.getRetryTime() <= now) {
+                            space -= d.getChunkLength();
+                            Log.debug("available space in pkt is " + space);
+                            if (space <= 0) {
+                                Log.verb("no room, come back later " + d.toString());
+                                break;
+                            } else {
+                                Log.verb("adding this to resend list " + d.toString());
+                                incrRwnd(d.getChunkLength());
+                                dcs.add(d);
+                                d.setRetryTime(now + getT3() - 1);
+                                d.incrementRetryCount();
+                            }
+                        } else if (d.getRetryTime() < nextTime) {
+                            nextTime = d.getRetryTime();
+                        }
                     }
                 }
-            }
-            if (!dcs.isEmpty()) {
-                Comparator<? super DataChunk> dcc = dcs.get(0);
-                Collections.sort(dcs, dcc);
-                DataChunk[] da = new DataChunk[dcs.size()];
-                int i = 0;
-                for (DataChunk d : dcs) {
-                    da[i++] = d;
-                }
-                resetTimer = true;
-                try {
-                    Log.debug("Sending retry for  " + da.length + " data chunks");
-                    this.send(da);
-                } catch (java.io.EOFException end) {
-                    if (Log.getLevel() >= Log.DEBUG){
-                        Log.debug("Retry send failed "+end.getMessage());
-                        end.printStackTrace();
+                if (!dcs.isEmpty()) {
+                    Comparator<? super DataChunk> dcc = dcs.get(0);
+                    Collections.sort(dcs, dcc);
+                    DataChunk[] da = new DataChunk[dcs.size()];
+                    int i = 0;
+                    for (DataChunk d : dcs) {
+                        da[i++] = d;
                     }
-                    unexpectedClose(end);
-                    resetTimer = false;
-                } catch (Exception ex) {
-                    Log.error("Cant send retry - eek " + ex.toString());
+                    try {
+                        Log.debug("Sending retry for  " + da.length + " data chunks");
+                        this.send(da);
+                    } catch (java.io.EOFException end) {
+                        if (Log.getLevel() >= Log.DEBUG) {
+                            Log.debug("Retry send failed " + end.getMessage());
+                            end.printStackTrace();
+                        }
+                        unexpectedClose(end);
+                    } catch (Exception ex) {
+                        Log.error("Cant send retry - eek " + ex.toString());
+                    }
+                } else {
+                    Log.verb("Nothing to do ");
                 }
-            } else {
-                Log.verb("Nothing to do ");
             }
-            if (resetTimer) {
-                _timer.setNextRun(getT3());
-                Log.verb("Try again in a while  "+getT3());
+            try {
+                long toSleep = nextTime - now;
+                Log.verb("Will sleep for " + toSleep);
+                Thread.sleep(toSleep);
+            } catch (InterruptedException ex) {
+                Log.info("sleep was awoken.");
             }
         }
+        Log.verb("leaving retry thread");
     }
 
     private long getT1() {
-        return   t1;
+        return t1;
     }
 
     /*
@@ -779,11 +786,11 @@ public class ThreadedAssociation extends Association implements Runnable {
      parameter 'RTO.Initial'.
      */
     // a guess at the round-trip time
-    private  void setRTOnonRFC(long r) {
+    private void setRTOnonRFC(long r) {
         _rto = 0.2;
     }
 
-    private  void setRTO(long r) {
+    private void setRTO(long r) {
         double nrto = 1.0;
         double cr = r / 1000.0;
         /*
@@ -819,7 +826,7 @@ public class ThreadedAssociation extends Association implements Runnable {
             _srtt = (1 - _rtoAlpha) * _srtt + _rtoAlpha * cr;
             nrto = _srtt + 4 * _rttvar;
         }
-        Log.debug("new r ="+r+"candidate  rto is " + nrto);
+        Log.debug("new r =" + r + "candidate  rto is " + nrto);
 
         if (nrto < _rtoMin) {
             Log.debug("clamping min rto as " + nrto + " < " + _rtoMin);
@@ -829,15 +836,15 @@ public class ThreadedAssociation extends Association implements Runnable {
             Log.debug("clamping max rto as " + nrto + " > " + _rtoMax);
             nrto = _rtoMax;
         }
-        if ((nrto < _rtoMax) && (nrto > _rtoMin)){
+        if ((nrto < _rtoMax) && (nrto > _rtoMin)) {
             // if still out of range (i.e. a NaN) ignore it.
             _rto = nrto;
         }
         Log.debug("new rto is " + _rto);
-        t1 = (long)(_rto * 1000) * 10;
-        Log.debug("T1 is now "+t1+" ms");
-        t3 = (_rto > 0.0) ? (long) (1000.0 * _rto): 100;
-        Log.debug("T3 is now "+t3+" ms");
+        t1 = (long) (_rto * 1000) * 10;
+        Log.debug("T1 is now " + t1 + " ms");
+        t3 = (_rto > 0.0) ? (long) (1000.0 * _rto) : 100;
+        Log.debug("T3 is now " + t3 + " ms");
         /*
 
 
@@ -878,5 +885,10 @@ public class ThreadedAssociation extends Association implements Runnable {
          C7)  A maximum value may be placed on RTO provided it is at least
          RTO.max seconds.
          */
+    }
+
+    public void unexpectedClose(EOFException end) {
+        super.unexpectedClose(end);
+        retryThread = null;
     }
 }

@@ -44,7 +44,6 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
    +-------------------------------+----------+-----------+------------+
 
      */
-
     public final static int WEBRTCCONTROL = 50;
     public final static int WEBRTCSTRING = 51;
     public final static int WEBRTCBINARY = 53;
@@ -179,7 +178,6 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 
      */
-
     public long getTsn() {
         return _tsn;
     }
@@ -278,8 +276,9 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
      */
     public String toString() {
         String ret = super.toString();
-        ret += " ppid = " + _ppid + "seqn " + _sSeqNo + " streamId " + _streamId + " tsn " + _tsn
-                + " retry " + _retryTime + " gap acked " + _gapAck;
+        ret += " ppid=" + _ppid + " seqn=" + _sSeqNo + " streamId=" + _streamId + " tsn=" + _tsn
+            + " retryAt=" + _retryTime +" retryCount="+_retryCount+" sentTime="+_sentTime 
+            +" gapacked=" + _gapAck;
         return ret;
     }
 
@@ -345,6 +344,27 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
 
     public void setSentTime(long now) {
         _sentTime = now;
+    }
+
+    public void clean() {
+        _tsn = 0;
+        _streamId = 0;
+        _sSeqNo = 0;
+        _ppid = 0;
+        _data = null;
+        _dataOffset = 0;
+        _dataLength = 0;
+        _open = null;
+        _invalid = null;
+        _gapAck = false;
+        _retryTime = 0;
+        _retryCount = 0;
+        _sentTime = 0;
+    }
+
+    public void incrementRetryCount() {
+        _retryCount ++;
+        Log.verb(" retry count is now "+_retryCount+" on "+_tsn);
     }
 
 }

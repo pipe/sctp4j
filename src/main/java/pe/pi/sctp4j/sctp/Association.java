@@ -759,7 +759,7 @@ abstract public class Association {
             ack.setTsn(_nearTSN++);
             // check rollover - will break at maxint.
             rep[0] = ack;
-
+// TODO This here is wrong- if it is dropped wont get retried
         } else {
             Log.debug("got a dcep ack for " + s.getLabel());
             SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
