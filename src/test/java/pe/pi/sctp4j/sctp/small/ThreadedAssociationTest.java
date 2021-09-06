@@ -271,48 +271,7 @@ public class ThreadedAssociationTest {
         assertTrue(result instanceof BlockingSCTPStream);
     }
 
-    /**
-     * Test of sendAndBlock method, of class ThreadedAssociation.
-     */
-    @Test
-    public void testSendAndBlock() throws Exception {
-        System.out.println("--> sendAndBlock");
-        final StringBuffer rightout = new StringBuffer();
-        final SCTPStreamListener rsl = new ASCTPStreamListener() {
-            @Override
-            synchronized public void onMessage(SCTPStream s, String message) {
-                Log.debug("onmessage : " + message);
-                rightout.append(message);
-                this.notify();
-            }
-        };
-        DatagramTransport trans[] = mkMockTransports();
-        MockAssociationListener listenLeft = new MockAssociationListener();
-        MockAssociationListener listenRight = new MockAssociationListener() {
-            @Override
-            public void onRawStream(SCTPStream s) {
-                super.onRawStream(s);
-                s.setSCTPStreamListener(rsl);
-            }
-        };
-        ThreadedAssociation instanceLeft = new ThreadedAssociation(trans[0], listenLeft);
-        ThreadedAssociation instanceRight = new ThreadedAssociation(trans[1], listenRight);
-        instanceLeft.associate();
-        synchronized (listenLeft) {
-            listenLeft.wait(1000);
-            assertTrue(listenLeft.associated);
-            assertTrue(listenRight.associated);
-        }
-        SCTPStream result = instanceLeft.mkStream("test Stream", rsl);
-        assert (result instanceof BlockingSCTPStream);
-        String test = "Test message";
-        SCTPMessage m = new SCTPMessage(test, result);
-        instanceLeft.sendAndBlock(m);
-        synchronized (rightout) {
-            rightout.wait(1000);
-            assertEquals(rightout.toString(), test);
-        }
-    }
+
 
     /**
      * Test of makeMessage method, of class ThreadedAssociation.
@@ -320,7 +279,6 @@ public class ThreadedAssociationTest {
     @Test
     public void testMakeMessage_byteArr_BlockingSCTPStream() throws Exception {
         System.out.println("---->makeMessage bytes");
-
         final ByteBuffer rightout = ByteBuffer.allocate(10000);
         final StringBuffer empty = new StringBuffer();
         final SCTPByteStreamListener rsl = new SCTPByteStreamListener() {
@@ -368,13 +326,13 @@ public class ThreadedAssociationTest {
         SCTPStream s = instanceLeft.mkStream("test Stream", rsl);
         assert (s instanceof BlockingSCTPStream);
         String test = "Test message";
-        SCTPMessage m = instanceLeft.makeMessage(test.getBytes(), (BlockingSCTPStream) s);
-        instanceLeft.sendAndBlock(m);
+        byte [] testBytes = test.getBytes();
+        s.send(testBytes);
         synchronized (rightout) {
             rightout.wait(2000);
             int l = rightout.position();
             String res = new String(rightout.array(), 0, l);
-            assertEquals(res, test);
+            assertEquals(test,res);
             assertEquals(empty.length(), 0);
         }
     }
@@ -403,7 +361,6 @@ public class ThreadedAssociationTest {
             @Override
             public void onRawStream(SCTPStream s) {
                 super.onRawStream(s);
-                s.setBehave(new OrderedStreamBehaviour());
                 s.setSCTPStreamListener(rsl);
             }
         };
@@ -415,15 +372,13 @@ public class ThreadedAssociationTest {
             assert (listenLeft.associated);
             assert (listenRight.associated);
         }
-        int id = 10;
-        SCTPStream s = instanceLeft.mkStream(id);
+        SCTPStream s = instanceLeft.mkStream("TestStream");
         assert (s instanceof BlockingSCTPStream);
         String test = "Test message";
-        SCTPMessage m = instanceLeft.makeMessage(test, (BlockingSCTPStream) s);
-        instanceLeft.sendAndBlock(m);
+        s.send(test);
         synchronized (rightout) {
             rightout.wait(2000);
-            assertEquals(rightout.toString(), test);
+            assertEquals(test, rightout.toString());
         }
     }
 
@@ -468,9 +423,8 @@ public class ThreadedAssociationTest {
             assertTrue(listenLeft.associated);
             assertTrue(listenRight.associated);
         }
-        int id = 10;
         String label = "test Stream";
-        final SCTPStream s = instanceLeft.mkStream(id, label);
+        final SCTPStream s = instanceLeft.mkStream(label);
         synchronized (rightLabel) {
             rightLabel.wait(2000);
             assertEquals(rightLabel.toString(), label);

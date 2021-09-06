@@ -48,10 +48,22 @@ public class DCEPStreamBehaviour implements
     @Override
     public void deliver(SCTPStream s, SortedSet<DataChunk> a, SCTPStreamListener l) {
         DataChunk dc = a.first();
+        int flags = dc.getFlags() & DataChunk.SINGLEFLAG; // mask to the bits we want
+        long tsn = dc.getTsn();
+        int messageNo = s.getNextMessageSeqIn();
+       
+        
+
 // only interested in the first chunk which should be an ack or an open.
         DCOpen dcep = dc.getDCEP();
         if (dcep != null) {
             Log.debug("DCEPStreamBehaviour has a dcep first.");
+            if(flags != DataChunk.SINGLEFLAG){
+                Log.error("Dcep isn't a single !!?!");
+            }
+            messageNo++;
+            s.setNextMessageSeqIn(messageNo);
+            a.remove(dc);
             SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
             s.setBehave(behave);
             if (!dcep.isAck()) {
@@ -76,7 +88,7 @@ public class DCEPStreamBehaviour implements
                     ((SCTPOutboundStreamOpenedListener) l).opened(s);
                 }
             }
-            a.remove(dc);
+
             // and consume the rest using the new behave.
             if (behave != null) {
                 behave.deliver(s, a, l);

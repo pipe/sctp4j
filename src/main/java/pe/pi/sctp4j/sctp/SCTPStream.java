@@ -22,6 +22,8 @@ import pe.pi.sctp4j.sctp.messages.Chunk;
 import pe.pi.sctp4j.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
 import java.util.TreeSet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
@@ -80,8 +82,12 @@ public abstract class SCTPStream {
                 + ((_sl != null) ? _sl.getClass().getSimpleName() : "null");
     }
 
-    void send(SCTPMessage mess) {
-        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    void send(SCTPMessage mess)  {
+        try {
+            _ass.sendAndBlock(mess);
+        } catch (Exception ex) {
+            Log.warn("Can't send SCTPmessage because "+ex.getMessage());
+        }
     }
 
     synchronized void setAsNextMessage(SCTPMessage m) {
@@ -115,7 +121,7 @@ public abstract class SCTPStream {
     }
 
     public Chunk[] append(DataChunk dc) {
-        Log.debug("adding data to stash on stream " + _label + "(" + dc + ")");
+        Log.debug("adding data to stash on stream " + ((_label==null)?"*unnamed*":_label) + "(" + dc + ")");
         _stash.add(dc);
         return _behave.respond(this);
     }
