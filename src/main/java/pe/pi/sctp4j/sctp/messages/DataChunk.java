@@ -248,7 +248,7 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
     public void setsSeqNo(int sSeqNo) {
         _sSeqNo = sSeqNo;
     }
-
+/*
     public DataChunk mkAck(DCOpen dcep) {
         DataChunk ack = new DataChunk();
         ack.setData(dcep.mkAck());
@@ -266,7 +266,7 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
         open.setFlags(DataChunk.SINGLEFLAG);
         return open;
     }
-
+*/
     /*
     public DataChunk(String s) {
         this();

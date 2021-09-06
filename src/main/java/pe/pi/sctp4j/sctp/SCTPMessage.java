@@ -19,6 +19,7 @@ package pe.pi.sctp4j.sctp;
 import pe.pi.sctp4j.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
 import java.util.SortedSet;
+import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
  *
@@ -53,7 +54,14 @@ public class SCTPMessage implements Runnable {
         _stream = s;
         _pPid = (data.length() > 0)?DataChunk.WEBRTCSTRING:DataChunk.WEBRTCSTRINGEMPTY;
     }
-
+    
+    public SCTPMessage(DCOpen dcep, SCTPStream s) {
+        byte[] data = dcep.getBytes();
+        _data = (data.length > 0)?data:new byte[1];
+        _stream = s;
+        _pPid = (data.length > 0)?DataChunk.WEBRTCCONTROL:DataChunk.WEBRTCBINARYEMPTY;
+    }
+    
     public SCTPMessage(SCTPStream s, SortedSet<DataChunk> chunks) {
         _stream = s;
         int tot = 0;

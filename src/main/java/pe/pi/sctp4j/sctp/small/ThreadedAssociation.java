@@ -31,6 +31,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import org.bouncycastle.tls.DatagramTransport;
+import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
  * An association who's retries etc are managed with plain old threads.
@@ -154,7 +155,7 @@ public class ThreadedAssociation extends Association implements Runnable {
             _freeBlocks.add(dc);
         }
         resetCwnd();
-        retryThread = new Thread(this, "SCTPTimer" + this.getPeerId());
+        retryThread = new Thread(this, "SCTPRetry");
         retryThread.start();
     }
 
@@ -276,40 +277,7 @@ public class ThreadedAssociation extends Association implements Runnable {
         }
     }
 
-    @Override
-    synchronized public SCTPMessage makeMessage(byte[] bytes, BlockingSCTPStream s) {
-        SCTPMessage m = null;
-        if (super.canSend()) {
-            if (bytes.length < this.maxMessageSize()) {
-                m = new SCTPMessage(bytes, s);
-                synchronized (s) {
-                    int mseq = s.getNextMessageSeqOut();
-                    s.setNextMessageSeqOut(mseq + 1);
-                    m.setSeq(mseq);
-                }
-            }
-        }
-        return m;
-    }
-
-    @Override
-    public SCTPMessage makeMessage(String bytes, BlockingSCTPStream s) {
-        SCTPMessage m = null;
-        if (super.canSend()) {
-            if (bytes.length() < this.maxMessageSize()) {
-                m = new SCTPMessage(bytes, s);
-                synchronized (s) {
-                    int mseq = s.getNextMessageSeqOut();
-                    s.setNextMessageSeqOut(mseq + 1);
-                    m.setSeq(mseq);
-                }
-            } else {
-                Log.warn("Message too long " + bytes.length() + " > " + this.maxMessageSize());
-            }
-        }
-        return m;
-    }
-
+   
     /**
      * try and create a sack packet - if we have any new acks to send or null if
      * we don't
@@ -891,4 +859,8 @@ public class ThreadedAssociation extends Association implements Runnable {
         super.unexpectedClose(end);
         retryThread = null;
     }
+
+
+
+
 }

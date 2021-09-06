@@ -23,6 +23,7 @@ import pe.pi.sctp4j.sctp.messages.DataChunk;
 import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
  *
@@ -49,6 +50,13 @@ public class BlockingSCTPStream extends SCTPStream {
     }
     @Override
     synchronized public void send(byte[] message) throws Exception {
+        Association a = super.getAssociation();
+        SCTPMessage m = a.makeMessage(message, this);
+        undeliveredOutboundMessages.put(m.getSeq(),m);
+        a.sendAndBlock(m);
+    }
+    @Override
+    synchronized public void send(DCOpen message) throws Exception {
         Association a = super.getAssociation();
         SCTPMessage m = a.makeMessage(message, this);
         undeliveredOutboundMessages.put(m.getSeq(),m);

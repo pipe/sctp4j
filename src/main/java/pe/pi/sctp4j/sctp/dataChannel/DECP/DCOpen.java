@@ -92,6 +92,10 @@ public class DCOpen {
         this((byte) RELIABLE, 0, 0, label, "");
     }
 
+    // used to make Acks only
+    private DCOpen() {
+    }
+
     public DCOpen(
             byte chanType,
             int priority,
@@ -198,8 +202,8 @@ public class DCOpen {
                 behave = new UnorderedStreamBehaviour();
                 break;
         }
-        if (behave != null){
-            Log.debug(_label + " behaviour is " +behave.getClass().getSimpleName());
+        if (behave != null) {
+            Log.debug(_label + " behaviour is " + behave.getClass().getSimpleName());
         }
 
         return behave;
@@ -209,10 +213,17 @@ public class DCOpen {
         return new String(_label);
     }
 
-    public byte[] mkAck() {
-        byte[] a = new byte[1];
-        a[0] = ACK;
-        return a;
+    public static DCOpen mkAck() {
+        DCOpen ack = new DCOpen() {
+            @Override
+            public byte[] getBytes() {
+                byte[] a = new byte[1];
+                a[0] = ACK;
+                return a;
+            }
+        };
+        ack._isAck = true;
+        return ack;
     }
 
 }

@@ -17,9 +17,7 @@
 package pe.pi.sctp4j.sctp;
 
 import pe.pi.sctp4j.sctp.messages.exceptions.SctpPacketFormatException;
-import pe.pi.sctp4j.sctp.behave.SCTPStreamBehaviour;
 import pe.pi.sctp4j.sctp.messages.exceptions.UnreadyAssociationException;
-import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 import pe.pi.sctp4j.sctp.messages.*;
 
@@ -41,6 +39,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.bouncycastle.tls.DatagramTransport;
+import pe.pi.sctp4j.sctp.behave.DCEPStreamBehaviour;
+import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
  *
@@ -464,19 +464,23 @@ abstract public class Association {
         Packet ob = new Packet(_srcPort, _destPort, _peerVerTag);
         // cookie ACKs _must_ come before data or sacks
         Arrays.asList(cs).stream()
-                .filter((Chunk c) -> {return c.getType() == Chunk.COOKIE_ACK; })
+                .filter((Chunk c) -> {
+                    return c.getType() == Chunk.COOKIE_ACK;
+                })
                 .forEach((Chunk r) -> {
                     Log.debug("adding Cookie Ack chunk to outbound packet " + r.toString());
                     ob.getChunkList().add(r);
                 }
-        );
+                );
         Arrays.asList(cs).stream()
-                .filter((Chunk c) -> {return c.getType() != Chunk.COOKIE_ACK; })
+                .filter((Chunk c) -> {
+                    return c.getType() != Chunk.COOKIE_ACK;
+                })
                 .forEach((Chunk r) -> {
                     Log.debug("adding normal chunk to outbound packet " + r.toString());
                     ob.getChunkList().add(r);
                 }
-        );
+                );
         ByteBuffer obb = ob.getByteBuffer();
         return obb;
     }
@@ -662,26 +666,18 @@ abstract public class Association {
         long tsn = dc.getTsn();
         SCTPStream in = _streams.get(sno);
         if (in == null) {
+            Log.verb("making new stream " + sno);
             in = mkStream(sno);
             synchronized (_streams) {
                 _streams.put(sno, in);
             }
             _al.onRawStream(in);
+            in.setBehave(new DCEPStreamBehaviour(_al));
+            // assumption here is that all inbound streams start with a DCEP
+            // those that don't will suffer ;-)
         }
         Chunk[] repa;
-        // todo dcep logic belongs in behave - not here.
-        if (dc.getDCEP() != null) {
-            repa = dcepDeal(in, dc, dc.getDCEP());
-            // delay 'till after first packet so we can get the label etc set 
-            // _however_ this should be in behave -as mentioned above.
-            try {
-                _al.onDCEPStream(in, in.getLabel(), dc.getPpid());
-            } catch (Exception x) {
-                closer = in.immediateClose();
-            }
-        } else {
-            repa = in.append(dc);
-        }
+        repa = in.append(dc);
 
         if (repa != null) {
             for (Chunk r : repa) {
@@ -690,7 +686,7 @@ abstract public class Association {
         }
         if (closer != null) {
             rep.add(closer);
-        }
+        } //closer logic is broken here - perhaps use an exception ?
         in.inbound(dc);
         _farTSN = tsn;
     }
@@ -734,48 +730,6 @@ abstract public class Association {
         SackChunk sack = mkSack(l, duplicates);
         rep.add(sack);
         return rep.toArray(dummy);
-    }
-// todo should be in a behave block
-// then we wouldn't be messing with stream seq numbers.
-
-    private Chunk[] dcepDeal(SCTPStream s, DataChunk dc, DCOpen dcep) {
-        Chunk[] rep = null;
-        Log.debug("dealing with a decp for stream " + dc.getDataAsString());
-        if (!dcep.isAck()) {
-            Log.debug("decp is not an ack... ");
-
-            SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
-            s.setBehave(behave);
-            s.setLabel(dcep.getLabel());
-            synchronized (s) {
-                int seqIn = s.getNextMessageSeqIn();
-                s.setNextMessageSeqIn(seqIn + 1);
-                int seqOut = s.getNextMessageSeqOut();
-                s.setNextMessageSeqOut(seqOut + 1);
-            }
-            rep = new Chunk[1];
-            DataChunk ack = dc.mkAck(dcep);
-            s.outbound(ack);
-            ack.setTsn(_nearTSN++);
-            // check rollover - will break at maxint.
-            rep[0] = ack;
-// TODO This here is wrong- if it is dropped wont get retried
-        } else {
-            Log.debug("got a dcep ack for " + s.getLabel());
-            SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
-            s.setBehave(behave);
-            synchronized (s) {
-                int seqIn = s.getNextMessageSeqIn();
-                s.setNextMessageSeqIn(seqIn + 1);
-                int seqOut = s.getNextMessageSeqOut();
-                s.setNextMessageSeqOut(seqOut + 1);
-            }
-            SCTPStreamListener l = s.getSCTPStreamListener();
-            if ((l != null) && (l instanceof SCTPOutboundStreamOpenedListener)) {
-                ((SCTPOutboundStreamOpenedListener) l).opened(s);
-            }
-        }
-        return rep;
     }
 
     /**
@@ -912,7 +866,7 @@ abstract public class Association {
         int tries = this._maxOutStreams;
         synchronized (_streams) {
             do {
-                n = 2 * _random.nextInt(this._maxOutStreams/2);
+                n = 2 * _random.nextInt(this._maxOutStreams / 2);
                 if (!_even) {
                     n += 1;
                 }
@@ -961,16 +915,9 @@ abstract public class Association {
                 sout.setLabel(label);
                 _streams.put(sno, sout);
             }// todo - move this to behave
-            DataChunk dcopen = DataChunk.mkDCOpen(label);
-            sout.outbound(dcopen);
-            //sout.setNextMessageSeqOut(1);
-            dcopen.setTsn(_nearTSN++);
-            Chunk[] hack = {dcopen};
-            try {
-                send(hack);
-            } catch (java.io.EOFException end) {
-                unexpectedClose(end);
-            }
+            DCOpen dco = new DCOpen(label);
+            SCTPMessage mess = makeMessage(dco, sout);
+            sout.send(mess);
         } else {
             throw new UnreadyAssociationException();
         }
@@ -1041,9 +988,48 @@ abstract public class Association {
 
     abstract public void sendAndBlock(SCTPMessage m) throws Exception;
 
-    abstract public SCTPMessage makeMessage(byte[] bytes, BlockingSCTPStream aThis);
+    synchronized public SCTPMessage makeMessage(byte[] bytes, SCTPStream s) {
+        SCTPMessage m = null;
+        if (canSend()) {
+            if (bytes.length < this.maxMessageSize()) {
+                m = new SCTPMessage(bytes, s);
+                s.setAsNextMessage(m);
+            } else {
+                Log.warn("Message too long " + bytes.length + " > " + this.maxMessageSize());
+            }
+        }
+        return m;
+    }
 
-    abstract public SCTPMessage makeMessage(String s, BlockingSCTPStream aThis);
+    synchronized public SCTPMessage makeMessage(String string, SCTPStream s) {
+        SCTPMessage m = null;
+        if (canSend()) {
+            if (string.length() < this.maxMessageSize()) {
+                m = new SCTPMessage(string, s);
+                s.setAsNextMessage(m);
+            } else {
+                Log.warn("Message too long " + string.length() + " > " + this.maxMessageSize());
+            }
+        }
+        return m;
+    }
+
+    synchronized public SCTPMessage makeMessage(DCOpen dco, SCTPStream s) {
+        SCTPMessage m = null;
+        byte[] bytes = dco.getBytes();
+        if (canSend()) {
+            if (bytes.length < this.maxMessageSize()) {
+                m = new SCTPMessage(dco, s);
+                s.setAsNextMessage(m);
+                if (m.getSeq() != 0) {
+                    Log.warn("DCO should be the first message in a stream");
+                }
+            } else {
+                Log.warn("Message too long " + bytes.length + " > " + this.maxMessageSize());
+            }
+        }
+        return m;
+    }
 
     abstract protected Chunk[] sackDeal(SackChunk sackChunk);
 

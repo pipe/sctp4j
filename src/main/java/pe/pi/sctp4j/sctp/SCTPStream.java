@@ -22,6 +22,7 @@ import pe.pi.sctp4j.sctp.messages.Chunk;
 import pe.pi.sctp4j.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
 import java.util.TreeSet;
+import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
  *
@@ -71,12 +72,27 @@ public abstract class SCTPStream {
     }
 
     public String toString() {
-        return this.getClass().getSimpleName() 
+        return this.getClass().getSimpleName()
                 + "[" + this._sno + "]"
                 + "=" + this._label
-                + "|"+_behave.getClass().getSimpleName()+"|"
-                +"->"
+                + "|" + _behave.getClass().getSimpleName() + "|"
+                + "->"
                 + ((_sl != null) ? _sl.getClass().getSimpleName() : "null");
+    }
+
+    void send(SCTPMessage mess) {
+        throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+
+    synchronized void setAsNextMessage(SCTPMessage m) {
+        int mseq = getNextMessageSeqOut();
+        setNextMessageSeqOut(mseq + 1);
+        m.setSeq(mseq);
+    }
+
+    public void openAck(DCOpen dcep) throws Exception {
+        DCOpen ack = DCOpen.mkAck();
+        send(ack);
     }
 
     enum State {
@@ -97,7 +113,6 @@ public abstract class SCTPStream {
     public Integer getNum() {
         return new Integer(_sno);
     }
-
 
     public Chunk[] append(DataChunk dc) {
         Log.debug("adding data to stash on stream " + _label + "(" + dc + ")");
@@ -156,6 +171,8 @@ public abstract class SCTPStream {
     abstract public void send(String message) throws Exception;
 
     abstract public void send(byte[] message) throws Exception;
+
+    abstract public void send(DCOpen message) throws Exception;
 
     public Association getAssociation() {
         return _ass;

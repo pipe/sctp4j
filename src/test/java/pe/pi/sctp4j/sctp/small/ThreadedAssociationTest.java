@@ -292,7 +292,6 @@ public class ThreadedAssociationTest {
             @Override
             public void onRawStream(SCTPStream s) {
                 super.onRawStream(s);
-                s.setBehave(new OrderedStreamBehaviour());
                 s.setSCTPStreamListener(rsl);
             }
         };
@@ -304,8 +303,7 @@ public class ThreadedAssociationTest {
             assertTrue(listenLeft.associated);
             assertTrue(listenRight.associated);
         }
-        int id = 10;
-        SCTPStream result = instanceLeft.mkStream(id);
+        SCTPStream result = instanceLeft.mkStream("test Stream", rsl);
         assert (result instanceof BlockingSCTPStream);
         String test = "Test message";
         SCTPMessage m = new SCTPMessage(test, result);
@@ -355,7 +353,6 @@ public class ThreadedAssociationTest {
             @Override
             public void onRawStream(SCTPStream s) {
                 super.onRawStream(s);
-                s.setBehave(new OrderedStreamBehaviour());
                 s.setSCTPStreamListener(rsl);
             }
         };
@@ -367,8 +364,8 @@ public class ThreadedAssociationTest {
             assertTrue(listenLeft.associated);
             assertTrue(listenRight.associated);
         }
-        int id = 10;
-        SCTPStream s = instanceLeft.mkStream(id);
+        //Log.setLevel(Log.VERB);
+        SCTPStream s = instanceLeft.mkStream("test Stream", rsl);
         assert (s instanceof BlockingSCTPStream);
         String test = "Test message";
         SCTPMessage m = instanceLeft.makeMessage(test.getBytes(), (BlockingSCTPStream) s);

@@ -22,34 +22,68 @@ import pe.pi.sctp4j.sctp.messages.Chunk;
 import pe.pi.sctp4j.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
 import java.util.SortedSet;
+import pe.pi.sctp4j.sctp.AssociationListener;
+import pe.pi.sctp4j.sctp.SCTPOutboundStreamOpenedListener;
+import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
  *
- * @author tim
- * what DCEPS do 
+ * @author tim what DCEPS do
  */
 public class DCEPStreamBehaviour implements
         SCTPStreamBehaviour {
 
+    private final AssociationListener al;
+
+    public DCEPStreamBehaviour(AssociationListener associationListener) {
+        al = associationListener;
+        Log.debug("DCEPStreamBehaviour");
+    }
+
     @Override
     public Chunk[] respond(SCTPStream a) {
-        Log.debug("in respond() for a opened stream " + a.getLabel());
         return null;
     }
 
     @Override
     public void deliver(SCTPStream s, SortedSet<DataChunk> a, SCTPStreamListener l) {
-        Log.debug("in deliver() for stream " + s.getLabel() + " with " + a.size() + " chunks. ");
-        // strictly this should be looking at flags etc, and bundling the result into a message
-        for (DataChunk dc : a) {
-            if (dc.getDCEP() != null) {
-                Log.debug("in deliver() for a DCEP message " + dc.getDataAsString());
+        DataChunk dc = a.first();
+// only interested in the first chunk which should be an ack or an open.
+        DCOpen dcep = dc.getDCEP();
+        if (dcep != null) {
+            Log.debug("DCEPStreamBehaviour has a dcep first.");
+            SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
+            s.setBehave(behave);
+            if (!dcep.isAck()) {
+                Log.debug("decp open  " + dcep.toString());
+                s.setLabel(dcep.getLabel());
+                try {
+                    s.openAck(dcep);
+                    al.onDCEPStream(s, s.getLabel(), dc.getPpid());
+                    // really you would rather have these two the other way around. Not acking
+                    // unless the creation fully works, But this is a 0-rtt protocol - so 
+                    // it is best to ack asap.
+                } catch (Exception x) {
+                    try {
+                        s.close();
+                    } catch (Exception sx) {
+                        Log.error("Can't close " + s.toString() + " because " + x.getMessage());
+                    }
+                }
             } else {
-                Log.debug("inbound data chunk is " + dc.toString());
-                l.onMessage(s, dc.getDataAsString());
+                Log.debug("got a dcep ack for " + s.getLabel());
+                if ((l != null) && (l instanceof SCTPOutboundStreamOpenedListener)) {
+                    ((SCTPOutboundStreamOpenedListener) l).opened(s);
+                }
             }
+            a.remove(dc);
+            // and consume the rest using the new behave.
+            if (behave != null) {
+                behave.deliver(s, a, l);
+            }
+        } else {
+            Log.debug("Cant deliver chunks before DCEP");
         }
-        a.clear();
     }
 
 }

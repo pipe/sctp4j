@@ -32,6 +32,8 @@ import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import static org.junit.Assert.*;
+import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
+import pe.pi.sctp4j.sctp.dummy.DummyStream;
 
 /**
  *
@@ -64,25 +66,10 @@ public class UnorderedStreamBehaviourTest {
     SCTPStream mockStream() {
         Association a = null;
         Integer n = new Integer(10);
-        return new SCTPStream(a, n) {
-            @Override
-            public void send(String message) throws Exception {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
-
+        return new DummyStream(a, n) {
             @Override
             public void deliverMessage(SCTPMessage message) {
                 message.run();
-            }
-
-            @Override
-            public void send(byte[] message) throws Exception {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
-
-            @Override
-            public void delivered(DataChunk d) {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
         };
     }

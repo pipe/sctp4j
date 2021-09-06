@@ -29,6 +29,8 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.*;
+import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
+import pe.pi.sctp4j.sctp.dummy.DummyStream;
 
 /**
  *
@@ -104,42 +106,17 @@ public class SCTPMessageTest {
                 throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
 
-            @Override
-            public SCTPMessage makeMessage(byte[] bytes, BlockingSCTPStream aThis) {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
-
-            @Override
-            public SCTPMessage makeMessage(String s, BlockingSCTPStream aThis) {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
 
             @Override
             protected Chunk[] sackDeal(SackChunk sackChunk) {
                 throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
         };
-        _fakeStream = new SCTPStream(_fakeAssociation, new Integer(22)) {
-            @Override
-            public void send(String message) throws Exception {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
-
+        _fakeStream = new DummyStream(_fakeAssociation, new Integer(22)) {
             @Override
             public void deliverMessage(SCTPMessage message) {
                 message.run();
             }
-
-            @Override
-            public void send(byte[] message) throws Exception {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
-
-            @Override
-            public void delivered(DataChunk d) {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
-
         };
     }
 
