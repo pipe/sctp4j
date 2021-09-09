@@ -136,7 +136,7 @@ abstract public class Association {
     private int MAXSTREAMS = 1000;
     private int _maxOutStreams;
     private int _maxInStreams;
-    final static int MAXBUFF = 20 * 1024;
+    final static int MAXBUFF = 128 * 1024;
     public long _nearTSN;
     private int _srcPort;
     private int _destPort;
@@ -146,7 +146,7 @@ abstract public class Association {
     protected State _state;
     private HashMap<Long, DataChunk> _holdingPen;
     private static int TICK = 1000; // loop time in rcv
-    static int __assocNo = 1;
+    protected static int __assocNo = 1;
     private ReconfigState reconfigState;
 
     private String peerId;
@@ -561,15 +561,6 @@ abstract public class Association {
     protected Chunk[] iackDeal(InitAckChunk iack) {
         Chunk[] reply = null;
 
-        iack.getAdRecWinCredit();
-        iack.getInitialTSN();
-        iack.getNumInStreams();
-        iack.getNumOutStreams();
-        /* 
-         NOTE: TO DO - this is a protocol violation - this should be done with
-         multiple TCBS and set in cookie echo 
-         NOT HERE
-         */
 
         _peerVerTag = iack.getInitiateTag();
         _winCredit = iack.getAdRecWinCredit();

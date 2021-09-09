@@ -19,17 +19,18 @@ package pe.pi.sctp4j.sctp.small;
 import pe.pi.sctp4j.sctp.Association;
 import pe.pi.sctp4j.sctp.AssociationListener;
 import pe.pi.sctp4j.sctp.SCTPByteStreamListener;
-import pe.pi.sctp4j.sctp.SCTPMessage;
 import pe.pi.sctp4j.sctp.SCTPStream;
 import pe.pi.sctp4j.sctp.SCTPStreamListener;
-import pe.pi.sctp4j.sctp.behave.OrderedStreamBehaviour;
 import com.phono.srtplight.Log;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.bouncycastle.tls.DatagramTransport;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -187,7 +188,7 @@ public class ThreadedAssociationTest {
                 throw new java.io.EOFException("transport shut.");
             }
             Log.debug("Transport  shutdown.");
-            if (Log.getLevel() >= Log.DEBUG){
+            if (Log.getLevel() >= Log.DEBUG) {
                 Exception where = new Exception("stack trace");
                 where.printStackTrace();
             }
@@ -271,8 +272,6 @@ public class ThreadedAssociationTest {
         assertTrue(result instanceof BlockingSCTPStream);
     }
 
-
-
     /**
      * Test of makeMessage method, of class ThreadedAssociation.
      */
@@ -326,13 +325,13 @@ public class ThreadedAssociationTest {
         SCTPStream s = instanceLeft.mkStream("test Stream", rsl);
         assert (s instanceof BlockingSCTPStream);
         String test = "Test message";
-        byte [] testBytes = test.getBytes();
+        byte[] testBytes = test.getBytes();
         s.send(testBytes);
         synchronized (rightout) {
             rightout.wait(2000);
             int l = rightout.position();
             String res = new String(rightout.array(), 0, l);
-            assertEquals(test,res);
+            assertEquals(test, res);
             assertEquals(empty.length(), 0);
         }
     }
@@ -343,7 +342,7 @@ public class ThreadedAssociationTest {
     @Test
     public void testMakeMessage_String_BlockingSCTPStream() throws Exception {
         System.out.println("---->makeMessage string");
-
+        //Log.setLevel(Log.VERB);
         final StringBuffer rightout = new StringBuffer();
         final SCTPStreamListener rsl = new ASCTPStreamListener() {
             @Override
@@ -375,11 +374,18 @@ public class ThreadedAssociationTest {
         SCTPStream s = instanceLeft.mkStream("TestStream");
         assert (s instanceof BlockingSCTPStream);
         String test = "Test message";
-        s.send(test);
+        new Thread(() -> {
+            try {
+                s.send(test);
+            } catch (Exception ex) {
+                assert (false);
+            }
+        }).start();
         synchronized (rightout) {
             rightout.wait(2000);
             assertEquals(test, rightout.toString());
         }
+        //Log.setLevel(Log.INFO);
     }
 
     /**
@@ -432,28 +438,200 @@ public class ThreadedAssociationTest {
         assert (s instanceof BlockingSCTPStream);
         BlockingSCTPStream bs = (BlockingSCTPStream) s;
         StringBuffer longTestMessage = new StringBuffer();
-        for (int i = 0; i < 10; i++) {
-            longTestMessage.append(" " + i);
+        for (int i = 0; i < 1000; i++) {
+            longTestMessage.append("This is a test message number: " + i);
         }
+        //Log.setLevel(Log.VERB);
         final String testString = longTestMessage.toString();
         System.out.println("-------> String length = " + testString.length());
-        Runnable send = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    s.send(testString);
-                } catch (Exception ex) {
-                    Log.warn(ex.getMessage());
-                }
+        new Thread(() -> {
+            try {
+                s.send(testString);
+            } catch (Exception ex) {
+                Log.warn(ex.getMessage());
+                assert (false);
             }
-        };
-        Thread st = new Thread(send, "sender ");
-        st.start();
+        }, "sender ").start();
 
         synchronized (rightout) {
             rightout.wait(10000);
-            assertEquals(testString, rightout.toString());
+            assertEquals(testString.length(), rightout.toString().length());
+            assertEquals(testString.hashCode(), rightout.toString().hashCode());
         }
+        //Log.setLevel(Log.INFO);
+
+    }
+
+    @Test
+    public void testDCEPStreamSendMultiple() throws Exception {
+        Log.setLevel(Log.INFO);
+        System.out.println("---->testDCEPStreamSend strings");
+
+        final ArrayList<String> rightout = new ArrayList();
+        final StringBuffer rightLabel = new StringBuffer();
+        final SCTPStreamListener rsl = new SCTPByteStreamListener() {
+            @Override
+            public void onMessage(SCTPStream s, String message) {
+                rightout.add(message);
+                Log.info("DCEP onmessage(String) : " + rightout.size());
+            }
+
+            @Override
+            public void onMessage(SCTPStream s, byte[] message) {
+                Log.info("DCEP onmessage(Byte[])  " + message.length);
+                if ((message.length == 1) && (message[0] == 0)) {
+                    synchronized (rightout) {
+                        rightout.notify();
+                    }
+                }
+            }
+
+            @Override
+            public void close(SCTPStream aThis) {
+            }
+        };
+        DatagramTransport trans[] = mkMockTransports();
+        MockAssociationListener listenLeft = new MockAssociationListener() {
+            @Override
+            public void onDCEPStream(SCTPStream s, String label, int type) {
+            }
+        };
+        MockAssociationListener listenRight = new MockAssociationListener() {
+            @Override
+            public void onDCEPStream(SCTPStream s, String label, int type) {
+                s.setSCTPStreamListener(rsl);
+                rightLabel.append(label);
+            }
+        };
+        ThreadedAssociation instanceLeft = new ThreadedAssociation(trans[0], listenLeft);
+        ThreadedAssociation instanceRight = new ThreadedAssociation(trans[1], listenRight);
+        instanceLeft.associate();
+        synchronized (listenLeft) {
+            listenLeft.wait(2000);
+            assertTrue(listenLeft.associated);
+            assertTrue(listenRight.associated);
+        }
+        String label = "test Stream";
+        final SCTPStream s = instanceLeft.mkStream(label);
+        synchronized (rightLabel) {
+            rightLabel.wait(2000);
+            assertEquals(rightLabel.toString(), label);
+        }
+        assert (s instanceof BlockingSCTPStream);
+        BlockingSCTPStream bs = (BlockingSCTPStream) s;
+        StringBuffer longTestMessage = new StringBuffer();
+        for (int i = 0; i < 500; i++) {
+            longTestMessage.append("This is a test message number: " + i);
+        }
+        //Log.setLevel(Log.DEBUG);
+        final String testString = longTestMessage.toString();
+        System.out.println("-------> String length = " + testString.length());
+        int[] sentHash = new int[5];
+        new Thread(() -> {
+            try {
+                for (int i = 0; i < sentHash.length; i++) {
+                    String toSend = "i=" + i + testString;
+                    sentHash[i] = toSend.hashCode();
+                    s.send(toSend);
+                    System.out.println("-------> String count " + i);
+                }
+                s.send(new byte[1]);
+
+            } catch (Exception ex) {
+                Log.warn(ex.getMessage());
+                assert (false);
+            }
+        }, "sender ").start();
+
+        synchronized (rightout) {
+            rightout.wait(100000);
+            assertEquals(sentHash.length, rightout.size());
+            for (int i = 0; i < sentHash.length; i++) {
+                assertEquals(sentHash[i], rightout.get(i).hashCode());
+            }
+        }
+        //Log.setLevel(Log.NONE);
+
+    }
+
+    @Test
+    public void testDCEPStreamMultiple() throws Exception {
+        Log.setLevel(Log.INFO);
+        System.out.println("---->testDCEPStreamMultiple");
+
+        final ArrayList<String> rightLabels = new ArrayList();
+
+        DatagramTransport trans[] = mkMockTransports();
+        final SCTPStreamListener rsl = new SCTPByteStreamListener() {
+            @Override
+            public void onMessage(SCTPStream s, String message) {
+            }
+
+            @Override
+            public void onMessage(SCTPStream s, byte[] message) {
+                Log.info("DCEP onmessage(Byte[])  " + message.length);
+                if ((message.length == 1) && (message[0] == 0)) {
+                    synchronized (rightLabels) {
+                        rightLabels.notify();
+                    }
+                }
+            }
+
+            @Override
+            public void close(SCTPStream aThis) {
+            }
+        };
+
+        MockAssociationListener listenLeft = new MockAssociationListener() {
+            @Override
+            public void onDCEPStream(SCTPStream s, String label, int type) {
+            }
+        };
+        MockAssociationListener listenRight = new MockAssociationListener() {
+            @Override
+            public void onDCEPStream(SCTPStream s, String label, int type) {
+                s.setSCTPStreamListener(rsl);
+                rightLabels.add(label);
+            }
+        };
+        ThreadedAssociation instanceLeft = new ThreadedAssociation(trans[0], listenLeft);
+        ThreadedAssociation instanceRight = new ThreadedAssociation(trans[1], listenRight);
+
+        instanceLeft.associate();
+        synchronized (listenLeft) {
+            listenLeft.wait(2000);
+            assertTrue(listenLeft.associated);
+            assertTrue(listenRight.associated);
+        }
+        String label = "testStream";
+        int[] sentHash = new int[20];
+        new Thread(() -> {
+            try {
+                SCTPStream s = null;
+                for (int i = 0; i < sentHash.length; i++) {
+                    String labeln = label + i;
+                    sentHash[i] = labeln.hashCode();
+                    s = instanceLeft.mkStream(labeln);
+                    System.out.println("-------> Stream count " + i);
+                }
+                if (s != null) {
+                    s.send(new byte[1]);
+                }
+
+            } catch (Exception ex) {
+                Log.warn(ex.getMessage());
+                assert (false);
+            }
+        }, "sender ").start();
+
+        synchronized (rightLabels) {
+            rightLabels.wait(10000);
+            assertEquals(sentHash.length, rightLabels.size());
+            for (int i = 0; i < sentHash.length; i++) {
+                assertEquals(sentHash[i], rightLabels.get(i).hashCode());
+            }
+        }
+        //Log.setLevel(Log.NONE);
 
     }
 }

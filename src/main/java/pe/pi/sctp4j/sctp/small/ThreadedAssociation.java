@@ -26,12 +26,9 @@ import com.phono.srtplight.Log;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import org.bouncycastle.tls.DatagramTransport;
-import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
  * An association who's retries etc are managed with plain old threads.
@@ -137,7 +134,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     private final double _rtoMin = 0.01;
     private final double _rtoMax = 6.0;
     private long t1 = 1000; // first guess
-    private long t3 = 300; // ditto.
+    private long t3 = 1000; // ditto.
 
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
         super(transport, al);
@@ -155,7 +152,7 @@ public class ThreadedAssociation extends Association implements Runnable {
             _freeBlocks.add(dc);
         }
         resetCwnd();
-        retryThread = new Thread(this, "SCTPRetry");
+        retryThread = new Thread(this,"AssocRetry"+__assocNo);
         retryThread.start();
     }
 
@@ -174,6 +171,8 @@ public class ThreadedAssociation extends Association implements Runnable {
     protected Chunk[] iackDeal(InitAckChunk iack) {
         Chunk[] ret = super.iackDeal(iack);
         _stashCookieEcho = ret;
+        _rwnd = iack.getAdRecWinCredit();
+        _ssthresh = _rwnd;
         return ret;
     }
 
@@ -269,7 +268,7 @@ public class ThreadedAssociation extends Association implements Runnable {
                 Log.verb("In congestion sync block ");
                 while (!this.maySend(dc.getDataSize())) {
                     Log.verb("about to wait for congestion for " + this.getT3());
-                    _congestion.wait(this.getT3());// wholly wrong
+                    _congestion.wait(1000);// wholly wrong
                 }
             }
             // todo check rollover - will break at maxint.
@@ -346,6 +345,7 @@ public class ThreadedAssociation extends Association implements Runnable {
         setSsthresh(init);
         return super.inboundInit(init);
     }
+    
 
     /*
      B) Any time a DATA chunk is transmitted (or retransmitted) to a peer,
@@ -482,7 +482,8 @@ public class ThreadedAssociation extends Association implements Runnable {
                     }
                 }
             }
-            _rwnd = sack.getArWin() - totalDataInFlight;
+       
+            this._rwnd = sack.getArWin() - totalDataInFlight;
             Log.debug("Setting rwnd to " + _rwnd+ " "+sack.getArWin() +" - "+ totalDataInFlight);
             boolean advanced = (_lastCumuTSNAck < ackedTo);
             adjustCwind(advanced, totalDataInFlight, totalAcked);
@@ -545,11 +546,15 @@ public class ThreadedAssociation extends Association implements Runnable {
     boolean maySend(int sz) {
         // todo somehow take account of stuff sent without and sacks yet.......
         boolean maysend = (sz <= _rwnd);
+        /*
         if (!maysend) {
             maysend = (sz <= _cwnd);
             _cwnd -= sz;
         }
         Log.debug("MaySend " + maysend + " rwnd = " + _rwnd + " cwnd = " + _cwnd + " sz = " + sz);
+        */
+        Log.debug("MaySend (simple version ignores cwnd)" + maysend + " rwnd = " + _rwnd + " sz = " + sz);
+
         return maysend;
     }
 
@@ -678,55 +683,46 @@ public class ThreadedAssociation extends Association implements Runnable {
             Log.verb("retry timer went off ");
             if (canSend()) {
                 ArrayList<DataChunk> dcs = new ArrayList();
-                int space = _transpMTU - 12; // room for packet header
                 synchronized (_inFlight) {
-                    for (Long k : _inFlight.keySet()) {
-                        DataChunk d = _inFlight.get(k);
-                        if (d.getGapAck()) {
-                            Log.verb("skipping gap-acked tsn " + d.getTsn());
-                            continue;
-                        }
-                        if (d.getRetryTime() <= now) {
-                            space -= d.getChunkLength();
-                            Log.debug("available space in pkt is " + space);
-                            if (space <= 0) {
-                                Log.verb("no room, come back later " + d.toString());
-                                break;
-                            } else {
+                    Log.verb("have "+ _inFlight.values().stream().count()+" data chunks in flight");
+                    Log.verb("have "+_inFlight.values().stream().mapToInt((d)-> d.getDataSize()).sum()+" data bytes in flight");
+                    _inFlight.values().stream()
+                            .filter((d) -> (d.getRetryTime() <= now))
+                            .sorted().filter((d) -> !d.getGapAck()).forEachOrdered((d) -> {
                                 Log.verb("adding this to resend list " + d.toString());
-                                incrRwnd(d.getChunkLength());
                                 dcs.add(d);
-                                d.setRetryTime(now + getT3() - 1);
-                                d.incrementRetryCount();
                             }
-                        } else if (d.getRetryTime() < nextTime) {
-                            nextTime = d.getRetryTime();
-                        }
-                    }
+                    );
                 }
-                if (!dcs.isEmpty()) {
-                    Comparator<? super DataChunk> dcc = dcs.get(0);
-                    Collections.sort(dcs, dcc);
-                    DataChunk[] da = new DataChunk[dcs.size()];
-                    int i = 0;
-                    for (DataChunk d : dcs) {
-                        da[i++] = d;
-                    }
+// this isn't efficient - lots of small packets. limit it to 5 for now
+                int count =0 ;
+                
+                while (!dcs.isEmpty() && count < 5) {
+                    DataChunk[] da = new DataChunk[1];
+                    DataChunk d = dcs.remove(0);
+                    da[0] = d;
+                    d.setRetryTime(now + getT3() - 1);
+                    d.incrementRetryCount();
                     try {
-                        Log.debug("Sending retry for  " + da.length + " data chunks");
+                        Log.debug("Sending retry for  " + d);
                         this.send(da);
+                        count++;
                     } catch (java.io.EOFException end) {
                         if (Log.getLevel() >= Log.DEBUG) {
                             Log.debug("Retry send failed " + end.getMessage());
                             end.printStackTrace();
                         }
                         unexpectedClose(end);
+                        count =Integer.MAX_VALUE; // force exit
                     } catch (Exception ex) {
                         Log.error("Cant send retry - eek " + ex.toString());
                     }
-                } else {
-                    Log.verb("Nothing to do ");
                 }
+                if (count > 0){
+                    setCwndPostRetrans();
+                }
+            } else {
+                Log.verb("Can't send");
             }
             try {
                 long toSleep = nextTime - now;

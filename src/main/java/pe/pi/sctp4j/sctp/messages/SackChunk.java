@@ -50,7 +50,7 @@ public class SackChunk extends Chunk {
      * @param _arWin the _arWin to set
      */
     public void setArWin(long arWin) {
-        _arWin = arWin;
+        _arWin = Math.max(arWin,0);
     }
     /*
     
