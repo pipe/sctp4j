@@ -89,7 +89,7 @@ public class InitChunk extends Chunk {
                 } else if (v instanceof ChunkListParam){
                     _farChunks = ((ChunkListParam)v).getData();
                 } else {
-                    Log.verb("unexpected variable of type: "+v.getName());
+                    Log.debug("unexpected variable of type: "+v.getName());
                 }
             }
         }

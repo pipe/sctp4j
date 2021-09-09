@@ -257,7 +257,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     }
 
     @Override
-    public void sendAndBlock(SCTPMessage m) throws Exception {
+    public synchronized void sendAndBlock(SCTPMessage m) throws Exception {
         while (m.hasMoreData()) {
             DataChunk dc = _freeBlocks.take();
             dc.clean();

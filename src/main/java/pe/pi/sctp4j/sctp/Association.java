@@ -338,9 +338,9 @@ abstract public class Association {
         if ((c != null) && (c.length > 0)) {
             ByteBuffer obb = mkPkt(c);
             Log.verb("sending SCTP packet" + Packet.getHex(obb));
-            synchronized (this) {
+            //synchronized (this) {
                 _transp.send(obb.array(), obb.arrayOffset(), obb.position());
-            }
+            //}
         } else {
             Log.verb("Blocked empty packet send() - probably no response needed.");
         }
