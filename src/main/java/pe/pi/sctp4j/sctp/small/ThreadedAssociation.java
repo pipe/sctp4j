@@ -29,6 +29,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import org.bouncycastle.tls.DatagramTransport;
+import pe.pi.sctp4j.sctp.StreamNumberInUseException;
+import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
+import pe.pi.sctp4j.sctp.messages.exceptions.UnreadyAssociationException;
 
 /**
  * An association who's retries etc are managed with plain old threads.
@@ -210,11 +213,19 @@ public class ThreadedAssociation extends Association implements Runnable {
         init.setNextRun(getT1());
     }
 
-    public SCTPStream mkStream(int id) {
+    public BlockingSCTPStream mkStream(int id) {
         Log.debug("Make new Blocking stream " + id);
         return new BlockingSCTPStream(this, id);
     }
-
+    public SCTPStream mkStream(int sno, String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException, Exception {
+        SCTPStream sout = super.mkStream(sno, label);
+        if (sout != null) {
+            DCOpen dco = new DCOpen(label);
+            SCTPMessage mess = makeMessage(dco, sout);
+            sendAndBlock(mess);
+        }
+        return sout;
+    }
     public long getT3() {
         return t3;
     }
@@ -256,7 +267,6 @@ public class ThreadedAssociation extends Association implements Runnable {
 
     }
 
-    @Override
     public synchronized void sendAndBlock(SCTPMessage m) throws Exception {
         while (m.hasMoreData()) {
             DataChunk dc = _freeBlocks.take();

@@ -22,7 +22,6 @@ import pe.pi.sctp4j.sctp.messages.exceptions.UnreadyAssociationException;
 import pe.pi.sctp4j.sctp.messages.*;
 
 import pe.pi.sctp4j.sctp.messages.params.StaleCookieError;
-import pe.pi.sctp4j.sctp.small.BlockingSCTPStream;
 
 import com.phono.srtplight.Log;
 import java.io.EOFException;
@@ -38,6 +37,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bouncycastle.tls.DatagramTransport;
 import pe.pi.sctp4j.sctp.behave.DCEPStreamBehaviour;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
@@ -140,7 +140,7 @@ abstract public class Association {
     public long _nearTSN;
     private int _srcPort;
     private int _destPort;
-    final private HashMap<Integer, SCTPStream> _streams;
+    final private ConcurrentHashMap<Integer, SCTPStream> _streams;
     private final AssociationListener _al;
     private HashMap<Long, DataChunk> _outbound;
     protected State _state;
@@ -296,7 +296,7 @@ abstract public class Association {
         _random = new SecureRandom();
         _myVerTag = _random.nextInt();
         _transp = transport;
-        _streams = new HashMap();
+        _streams = new ConcurrentHashMap();
         _outbound = new HashMap<Long, DataChunk>();
         _holdingPen = new HashMap<Long, DataChunk>();
         _nearTSN = _random.nextInt(Integer.MAX_VALUE);
@@ -338,9 +338,7 @@ abstract public class Association {
         if ((c != null) && (c.length > 0)) {
             ByteBuffer obb = mkPkt(c);
             Log.verb("sending SCTP packet" + Packet.getHex(obb));
-            //synchronized (this) {
-                _transp.send(obb.array(), obb.arrayOffset(), obb.position());
-            //}
+            _transp.send(obb.array(), obb.arrayOffset(), obb.position());
         } else {
             Log.verb("Blocked empty packet send() - probably no response needed.");
         }
@@ -430,7 +428,6 @@ abstract public class Association {
             case Chunk.SACK:
                 Log.debug("got tsak for TSN " + ((SackChunk) c).getCumuTSNAck());
                 reply = sackDeal((SackChunk) c);
-                // fix the outbound list here
                 break;
             case Chunk.RE_CONFIG:
                 reply = reconfigState.deal((ReConfigChunk) c);
@@ -561,7 +558,6 @@ abstract public class Association {
     protected Chunk[] iackDeal(InitAckChunk iack) {
         Chunk[] reply = null;
 
-
         _peerVerTag = iack.getInitiateTag();
         _winCredit = iack.getAdRecWinCredit();
         _farTSN = iack.getInitialTSN() - 1;
@@ -659,9 +655,7 @@ abstract public class Association {
         if (in == null) {
             Log.verb("making new stream " + sno);
             in = mkStream(sno);
-            synchronized (_streams) {
-                _streams.put(sno, in);
-            }
+            _streams.put(sno, in);
             _al.onRawStream(in);
             in.setBehave(new DCEPStreamBehaviour(_al));
             // assumption here is that all inbound streams start with a DCEP
@@ -816,13 +810,7 @@ abstract public class Association {
     }
 
     private int calcStashCap() {
-        int ret = 0;
-        synchronized (_streams) {
-            for (SCTPStream s : this._streams.values()) {
-                ret += s.stashCap();
-            }
-        }
-        return ret;
+        return _streams.values().stream().mapToInt((s) -> s.stashCap()).sum();
     }
 
     public abstract void enqueue(DataChunk d);
@@ -846,69 +834,62 @@ abstract public class Association {
         }
     }
 
-    public SCTPStream mkStream(String label, SCTPStreamListener sl) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
+    public SCTPStream mkStream(String label, SCTPStreamListener sl) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException, Exception {
         SCTPStream s = mkStream(label);
         s.setSCTPStreamListener(sl);
         return s;
     }
 
-    public SCTPStream mkStream(String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
+    public SCTPStream mkStream(String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException, Exception {
         int n = 1;
         int tries = this._maxOutStreams;
-        synchronized (_streams) {
-            do {
-                n = 2 * _random.nextInt(this._maxOutStreams / 2);
-                if (!_even) {
-                    n += 1;
-                }
-                if (--tries < 0) {
-                    throw new StreamNumberInUseException();
-                }
-            } while (_streams.containsKey(new Integer(n)));
-        }
+
+        do {
+            n = 2 * _random.nextInt(this._maxOutStreams / 2);
+            if (!_even) {
+                n += 1;
+            }
+            if (--tries < 0) {
+                throw new StreamNumberInUseException();
+            }
+        } while (_streams.containsKey(new Integer(n)));
+
         return mkStream(n, label);
     }
 
     int[] allStreams() {
         int[] ret = new int[0];
-        synchronized (_streams) {
-            Set<Integer> ks = _streams.keySet();
-            ret = new int[ks.size()];
-            int i = 0;
-            for (Integer k : ks) {
-                ret[i++] = k;
-            }
+        Set<Integer> ks = _streams.keySet();
+        ret = new int[ks.size()];
+        int i = 0;
+        for (Integer k : ks) {
+            ret[i++] = k;
         }
+
         return ret;
     }
 
     protected SCTPStream getStream(int s) {
-        synchronized (_streams) {
-            return _streams.get(s);
-        }
+        return _streams.get(s);
+
     }
 
     SCTPStream delStream(int s) {
-        synchronized (_streams) {
-            return _streams.remove(s);
-        }
+        return _streams.remove(s);
+
     }
 
-    public SCTPStream mkStream(int sno, String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException {
+    public SCTPStream mkStream(int sno, String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException, Exception {
         SCTPStream sout;
         if (canSend()) {
-            synchronized (_streams) {
-                sout = _streams.get(sno);
-                if (sout != null) {
-                    throw new StreamNumberInUseException();
-                }
-                sout = mkStream(sno);
-                sout.setLabel(label);
-                _streams.put(sno, sout);
-            }// todo - move this to behave
-            DCOpen dco = new DCOpen(label);
-            SCTPMessage mess = makeMessage(dco, sout);
-            sout.send(mess);
+
+            sout = mkStream(sno);
+            sout.setLabel(label);
+            SCTPStream sold = _streams.putIfAbsent(sno, sout);
+            if (sold != null) {
+                Log.warn("Stream number already in use " + sno);
+                throw new StreamNumberInUseException();
+            }
         } else {
             throw new UnreadyAssociationException();
         }
@@ -954,30 +935,30 @@ abstract public class Association {
     }
 
     public void closeAllStreams() {
-        synchronized (_streams) {
-            _streams.forEach((Integer sn, SCTPStream st) -> {
-                Log.debug("closing " + st.getLabel());
-                try {
-                    SCTPStreamListener li = st.getSCTPStreamListener();
-                    if (li != null) {
-                        li.close(st);
-                    }
-                } catch (Exception x) {
-                    Log.error("problem closing stream");
-                    if (Log.getLevel() >= Log.DEBUG) {
-                        x.printStackTrace();
-                    }
+
+        _streams.forEach((Integer sn, SCTPStream st) -> {
+            Log.debug("closing " + st.getLabel());
+            try {
+                SCTPStreamListener li = st.getSCTPStreamListener();
+                if (li != null) {
+                    li.close(st);
                 }
-            });
-            _streams.clear();
-        }
+            } catch (Exception x) {
+                Log.error("problem closing stream");
+                if (Log.getLevel() >= Log.DEBUG) {
+                    x.printStackTrace();
+                }
+            }
+        });
+        _streams.clear();
+
     }
 
     public boolean isAssociated() {
         return _state == State.ESTABLISHED;
     }
 
-    abstract public void sendAndBlock(SCTPMessage m) throws Exception;
+    //abstract public void sendAndBlock(SCTPMessage m) throws Exception;
 
     synchronized public SCTPMessage makeMessage(byte[] bytes, SCTPStream s) {
         SCTPMessage m = null;

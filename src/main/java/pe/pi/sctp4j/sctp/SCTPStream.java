@@ -81,7 +81,7 @@ public abstract class SCTPStream {
                 + "->"
                 + ((_sl != null) ? _sl.getClass().getSimpleName() : "null");
     }
-
+/*
     void send(SCTPMessage mess)  {
         try {
             _ass.sendAndBlock(mess);
@@ -89,7 +89,7 @@ public abstract class SCTPStream {
             Log.warn("Can't send SCTPmessage because "+ex.getMessage());
         }
     }
-
+*/
     synchronized void setAsNextMessage(SCTPMessage m) {
         int mseq = getNextMessageSeqOut();
         setNextMessageSeqOut(mseq + 1);

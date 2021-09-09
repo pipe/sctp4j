@@ -37,7 +37,7 @@ public class UDPForwardingStream extends BlockingSCTPStream implements Runnable 
     private final Thread _rcv;
 
     public UDPForwardingStream(Association a, Integer id, Integer toPort) throws SocketException {
-        super(a, id);
+        super((ThreadedAssociation)a, id);
         _udpSock = new DatagramSocket();
         SocketAddress addr = new InetSocketAddress("localhost", toPort.shortValue());
         _udpSock.bind(addr);

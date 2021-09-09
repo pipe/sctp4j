@@ -17,13 +17,13 @@
 package pe.pi.sctp4j.sctp.small;
 
 import pe.pi.sctp4j.sctp.SCTPMessage;
-import pe.pi.sctp4j.sctp.Association;
 import pe.pi.sctp4j.sctp.SCTPStream;
 import pe.pi.sctp4j.sctp.messages.DataChunk;
 import java.util.HashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
+import com.phono.srtplight.Log;
 
 /**
  *
@@ -32,35 +32,43 @@ import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 public class BlockingSCTPStream extends SCTPStream {
 
     private final ExecutorService _ex_service;
-    private HashMap<Integer,SCTPMessage> undeliveredOutboundMessages = new HashMap();
-    
-    BlockingSCTPStream(Association a, Integer id) {
+    private HashMap<Integer, SCTPMessage> undeliveredOutboundMessages = new HashMap();
+    private final ThreadedAssociation _ta;
+
+    BlockingSCTPStream(ThreadedAssociation a, Integer id) {
         super(a, id);
+        _ta = a;
         _ex_service = Executors.newSingleThreadExecutor();
     }
 
     @Override
     synchronized public void send(String message) throws Exception {
-        Association a = super.getAssociation();
-        SCTPMessage m = a.makeMessage(message, this);
-        if (m != null){
-            undeliveredOutboundMessages.put(m.getSeq(),m);
-            a.sendAndBlock(m);
+        SCTPMessage m = _ta.makeMessage(message, this);
+        if (m != null) {
+            undeliveredOutboundMessages.put(m.getSeq(), m);
+            _ta.sendAndBlock(m);
         }
     }
+
     @Override
     synchronized public void send(byte[] message) throws Exception {
-        Association a = super.getAssociation();
-        SCTPMessage m = a.makeMessage(message, this);
-        undeliveredOutboundMessages.put(m.getSeq(),m);
-        a.sendAndBlock(m);
+        SCTPMessage m = _ta.makeMessage(message, this);
+        undeliveredOutboundMessages.put(m.getSeq(), m);
+        _ta.sendAndBlock(m);
     }
+
     @Override
-    synchronized public void send(DCOpen message) throws Exception {
-        Association a = super.getAssociation();
-        SCTPMessage m = a.makeMessage(message, this);
-        undeliveredOutboundMessages.put(m.getSeq(),m);
-        a.sendAndBlock(m);
+    public void send(DCOpen message) throws Exception {
+        final SCTPMessage m = _ta.makeMessage(message, this);
+        undeliveredOutboundMessages.put(m.getSeq(), m);
+        _ex_service.execute(() -> {
+            try {
+                _ta.sendAndBlock(m);
+            } catch (Exception ex) {
+                Log.error("failed to send DCOpen" + m.toString());
+            }
+        });
+
     }
 
     @Override
@@ -71,16 +79,18 @@ public class BlockingSCTPStream extends SCTPStream {
     @Override
     public void delivered(DataChunk d) {
         int f = d.getFlags();
-        if ((f & DataChunk.ENDFLAG) > 0){
+        if ((f & DataChunk.ENDFLAG) > 0) {
             int ssn = d.getSSeqNo();
             SCTPMessage st = undeliveredOutboundMessages.remove(ssn);
-            if (st != null) {st.acked();}
+            if (st != null) {
+                st.acked();
+            }
         }
     }
 
     @Override
-    public boolean idle(){
+    public boolean idle() {
         return undeliveredOutboundMessages.isEmpty();
     }
-    
+
 }

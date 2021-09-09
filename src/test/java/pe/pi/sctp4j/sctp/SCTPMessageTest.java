@@ -102,12 +102,6 @@ public class SCTPMessageTest {
             }
 
             @Override
-            public void sendAndBlock(SCTPMessage m) throws Exception {
-                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
-            }
-
-
-            @Override
             protected Chunk[] sackDeal(SackChunk sackChunk) {
                 throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
             }
