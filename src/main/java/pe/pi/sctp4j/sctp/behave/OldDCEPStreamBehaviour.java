@@ -30,12 +30,12 @@ import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
  *
  * @author tim what DCEPS do
  */
-public class DCEPStreamBehaviour implements
+public class OldDCEPStreamBehaviour implements
         SCTPStreamBehaviour {
 
     private final AssociationListener al;
 
-    public DCEPStreamBehaviour(AssociationListener associationListener) {
+    public OldDCEPStreamBehaviour(AssociationListener associationListener) {
         al = associationListener;
         Log.debug("DCEPStreamBehaviour");
     }

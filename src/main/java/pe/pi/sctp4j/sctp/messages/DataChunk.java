@@ -86,33 +86,40 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
                     + " _sSeqNo : " + _sSeqNo
                     + " _ppid : " + _ppid);
             Log.debug("data size remaining " + _body.remaining());
-
             switch (_ppid) {
-                case WEBRTCCONTROL:
-                    ByteBuffer bb = _body.slice();
-                    try {
-                        _open = new DCOpen(bb);
-                    } catch (InvalidDataChunkException ex) {
-                        _invalid = ex;
-                    }
-                    Log.verb("Got an DCEP " + _open);
+                case WEBRTCBINARY:
+                    _data = new byte[_body.remaining()];
+                    _body.get(_data);
+                    _dataOffset = 0;
+                    _dataLength = _data.length;
+                    Log.verb("Binary data is " + Packet.getHex(_data));
                     break;
                 case WEBRTCSTRING:
-                    // what format is a string ?
                     _data = new byte[_body.remaining()];
                     _body.get(_data);
                     _dataOffset = 0;
                     _dataLength = _data.length;
                     Log.verb("String data is " + new String(_data));
                     break;
-                case WEBRTCBINARY:
+                case WEBRTCCONTROL:
                     _data = new byte[_body.remaining()];
                     _body.get(_data);
                     _dataOffset = 0;
                     _dataLength = _data.length;
-                    Log.verb("data is " + Packet.getHex(_data));
+                    Log.verb("Dcep data is " + Packet.getHex(_data));
                     break;
-
+                case WEBRTCSTRINGEMPTY:
+                    _data = new byte[0];
+                    _dataOffset = 0;
+                    _dataLength = _data.length;
+                    Log.verb("String data empty");
+                    break;
+                case WEBRTCBINARYEMPTY:
+                    _data = new byte[0];
+                    _dataOffset = 0;
+                    _dataLength = _data.length;
+                    Log.verb("Binary data empty");
+                    break;
                 default:
                     _invalid = new InvalidDataChunkException("Invalid Protocol Id in data Chunk " + _ppid);
                     break;
@@ -248,7 +255,8 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
     public void setsSeqNo(int sSeqNo) {
         _sSeqNo = sSeqNo;
     }
-/*
+
+    /*
     public DataChunk mkAck(DCOpen dcep) {
         DataChunk ack = new DataChunk();
         ack.setData(dcep.mkAck());
@@ -266,8 +274,8 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
         open.setFlags(DataChunk.SINGLEFLAG);
         return open;
     }
-*/
-    /*
+     */
+ /*
     public DataChunk(String s) {
         this();
         _data = s.getBytes();
@@ -277,8 +285,8 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
     public String toString() {
         String ret = super.toString();
         ret += " ppid=" + _ppid + " seqn=" + _sSeqNo + " streamId=" + _streamId + " tsn=" + _tsn
-            + " retryAt=" + _retryTime +" retryCount="+_retryCount+" sentTime="+_sentTime 
-            +" gapacked=" + _gapAck;
+                + " retryAt=" + _retryTime + " retryCount=" + _retryCount + " sentTime=" + _sentTime
+                + " gapacked=" + _gapAck;
         return ret;
     }
 
@@ -363,8 +371,8 @@ public class DataChunk extends Chunk implements Comparable, Comparator {
     }
 
     public void incrementRetryCount() {
-        _retryCount ++;
-        Log.verb(" retry count is now "+_retryCount+" on "+_tsn);
+        _retryCount++;
+        Log.verb(" retry count is now " + _retryCount + " on " + _tsn);
     }
 
 }

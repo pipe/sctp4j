@@ -22,8 +22,6 @@ import pe.pi.sctp4j.sctp.messages.Chunk;
 import pe.pi.sctp4j.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
 import java.util.TreeSet;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
@@ -99,6 +97,10 @@ public abstract class SCTPStream {
     public void openAck(DCOpen dcep) throws Exception {
         DCOpen ack = DCOpen.mkAck();
         send(ack);
+    }
+
+    void alOnDCEPStream(SCTPStream _stream, String label, int _pPid) throws Exception {
+        _ass.alOnDCEPStream(_stream, label,  _pPid);
     }
 
     enum State {

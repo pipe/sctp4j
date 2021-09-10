@@ -39,7 +39,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bouncycastle.tls.DatagramTransport;
-import pe.pi.sctp4j.sctp.behave.DCEPStreamBehaviour;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
@@ -51,6 +50,8 @@ abstract public class Association {
     private final boolean _even;
 
     public abstract void associate() throws SctpPacketFormatException, IOException;
+
+
 
     /**
      * <code>
@@ -657,9 +658,6 @@ abstract public class Association {
             in = mkStream(sno);
             _streams.put(sno, in);
             _al.onRawStream(in);
-            in.setBehave(new DCEPStreamBehaviour(_al));
-            // assumption here is that all inbound streams start with a DCEP
-            // those that don't will suffer ;-)
         }
         Chunk[] repa;
         repa = in.append(dc);
@@ -1002,7 +1000,9 @@ abstract public class Association {
         }
         return m;
     }
-
+    void alOnDCEPStream(SCTPStream _stream, String label, int _pPid) throws Exception {
+        _al.onDCEPStream(_stream, label, _pPid);
+    }
     abstract protected Chunk[] sackDeal(SackChunk sackChunk);
 
 }

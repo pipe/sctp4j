@@ -28,6 +28,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.bouncycastle.tls.DatagramTransport;
 import pe.pi.sctp4j.sctp.StreamNumberInUseException;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
@@ -140,7 +144,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     private long t3 = 1000; // ditto.
 
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
-        super(transport, al);
+        super(transport, new ExecutorAssociationListener(al));
         try {
             _transpMTU = Math.min(transport.getReceiveLimit(), transport.getSendLimit());
             Log.debug("Transport MTU is now " + _transpMTU);
@@ -864,6 +868,44 @@ public class ThreadedAssociation extends Association implements Runnable {
     public void unexpectedClose(EOFException end) {
         super.unexpectedClose(end);
         retryThread = null;
+    }
+
+    // takes the callback invocation off the rcv thread
+    private static class ExecutorAssociationListener implements AssociationListener {
+
+        private final AssociationListener _appAl;
+        private final ExecutorService _ex;
+
+        public ExecutorAssociationListener(AssociationListener al) {
+            _appAl = al;
+            _ex = Executors.newSingleThreadExecutor();
+        }
+
+        @Override
+        public void onAssociated(Association a) {
+           if (_appAl != null) {_ex.execute(() -> _appAl.onAssociated(a));}
+        }
+
+        @Override
+        public void onDisAssociated(Association a) {
+           if (_appAl != null) {_ex.execute(() -> _appAl.onDisAssociated(a));}
+        }
+
+        @Override
+        public void onDCEPStream(SCTPStream s, String label, int type) throws Exception {
+           if (_appAl != null) {_ex.execute(() -> {
+               try {
+                   _appAl.onDCEPStream(s,label,type);
+               } catch (Exception ex) {
+                   Log.warn("onDCEPStream threw exception "+ex.getMessage());
+               }
+           });}
+        }
+
+        @Override
+        public void onRawStream(SCTPStream s) {
+           if (_appAl != null) {_ex.execute(() -> _appAl.onRawStream(s));}
+        }
     }
 
 
