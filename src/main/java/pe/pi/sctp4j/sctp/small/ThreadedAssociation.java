@@ -30,8 +30,6 @@ import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bouncycastle.tls.DatagramTransport;
 import pe.pi.sctp4j.sctp.StreamNumberInUseException;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
@@ -878,7 +876,7 @@ public class ThreadedAssociation extends Association implements Runnable {
 
         public ExecutorAssociationListener(AssociationListener al) {
             _appAl = al;
-            _ex = Executors.newSingleThreadExecutor();
+            _ex = Executors.newSingleThreadExecutor((Runnable r) -> new Thread(r, "Assoc-" + (__assocNo-1) + "-Exec"));
         }
 
         @Override

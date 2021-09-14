@@ -183,6 +183,8 @@ public class SCTPMessage implements Runnable {
                     // unless the creation fully works, But this is a 0-rtt protocol - so 
                     // so you have to ack before the stream can send anything.
                 } catch (Exception x) {
+                    Log.error("Dcep ack failed to send");
+                    if (Log.getLevel() >= Log.DEBUG) {x.printStackTrace();}
                     try {
                         _stream.close();
                     } catch (Exception sx) {
@@ -203,6 +205,9 @@ public class SCTPMessage implements Runnable {
     @Override
     public void run() {
         Log.debug("delegated message delivery from stream of type " + _stream.getClass().getSimpleName());
+        if (_li != null){
+            Log.debug("delegated message delivery to listener of type " + _li.getClass().getSimpleName());
+        }
         byte data[] = _data;
         switch (_pPid) {
             case DataChunk.WEBRTCBINARYEMPTY:
@@ -211,6 +216,8 @@ public class SCTPMessage implements Runnable {
                 if ((_li != null) && (_li instanceof SCTPByteStreamListener)) {
                     ((SCTPByteStreamListener) _li).onMessage(_stream, data);
                     _delivered = true;
+                } else {
+                    _stream.earlyMessageEnqueue(this);
                 }
                 break;
             case DataChunk.WEBRTCSTRINGEMPTY:
@@ -219,6 +226,8 @@ public class SCTPMessage implements Runnable {
                 if (_li != null) {
                     _li.onMessage(_stream, new String(data));
                     _delivered = true;
+                } else {
+                    _stream.earlyMessageEnqueue(this);
                 }
                 break;
             case DataChunk.WEBRTCCONTROL:

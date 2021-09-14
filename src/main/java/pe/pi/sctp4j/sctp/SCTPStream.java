@@ -22,6 +22,8 @@ import pe.pi.sctp4j.sctp.messages.Chunk;
 import pe.pi.sctp4j.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.LinkedBlockingQueue;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 
 /**
@@ -40,10 +42,11 @@ public abstract class SCTPStream {
     Association _ass;
     private Integer _sno;
     private String _label;
-    private TreeSet<DataChunk> _stash;
+    private ConcurrentSkipListSet<DataChunk> _stash;
     private SCTPStreamListener _sl;
     private int _nextMessageSeqIn;
     private int _nextMessageSeqOut;
+    protected LinkedBlockingQueue<SCTPMessage> _earlyQueue;
     private boolean closing;
     private State state = State.OPEN;
 
@@ -79,7 +82,8 @@ public abstract class SCTPStream {
                 + "->"
                 + ((_sl != null) ? _sl.getClass().getSimpleName() : "null");
     }
-/*
+
+    /*
     void send(SCTPMessage mess)  {
         try {
             _ass.sendAndBlock(mess);
@@ -87,7 +91,7 @@ public abstract class SCTPStream {
             Log.warn("Can't send SCTPmessage because "+ex.getMessage());
         }
     }
-*/
+     */
     synchronized void setAsNextMessage(SCTPMessage m) {
         int mseq = getNextMessageSeqOut();
         setNextMessageSeqOut(mseq + 1);
@@ -96,11 +100,17 @@ public abstract class SCTPStream {
 
     public void openAck(DCOpen dcep) throws Exception {
         DCOpen ack = DCOpen.mkAck();
+        Log.debug("made a dcep ack for "+_label);
         send(ack);
     }
 
     void alOnDCEPStream(SCTPStream _stream, String label, int _pPid) throws Exception {
-        _ass.alOnDCEPStream(_stream, label,  _pPid);
+        _ass.alOnDCEPStream(_stream, label, _pPid);
+    }
+
+    void earlyMessageEnqueue(SCTPMessage early) {
+        Log.debug("enqueue an early message seq "+early.getSeq()+" on "+this.toString());
+        _earlyQueue.add(early);
     }
 
     enum State {
@@ -110,8 +120,9 @@ public abstract class SCTPStream {
     public SCTPStream(Association a, Integer id) {
         _ass = a;
         _sno = id;
-        _stash = new TreeSet<>(); // sort bt tsn
+        _stash = new ConcurrentSkipListSet(); // sort bt tsn
         _behave = new OrderedStreamBehaviour(); // default 'till we know different
+        _earlyQueue = new LinkedBlockingQueue(100);
     }
 
     public void setLabel(String l) {
@@ -123,7 +134,7 @@ public abstract class SCTPStream {
     }
 
     public Chunk[] append(DataChunk dc) {
-        Log.debug("adding data to stash on stream " + ((_label==null)?"*unnamed*":_label) + "(" + dc + ")");
+        Log.debug("adding data to stash on stream " + ((_label == null) ? "*unnamed*" : _label) + "(" + dc + ")");
         _stash.add(dc);
         return _behave.respond(this);
     }
@@ -171,9 +182,14 @@ public abstract class SCTPStream {
 
     public void setSCTPStreamListener(SCTPStreamListener sl) {
         _sl = sl;
-        Log.debug("action a delayed delivery now we have a listener.");
-        //todo think about what reliablility looks like here.
-        _behave.deliver(this, _stash, _sl);
+        if (_earlyQueue != null) {
+            Log.debug("delivering early " + _earlyQueue.size() + " messages to "+sl.getClass().getSimpleName());
+
+            SCTPMessage e = null;
+            while (null != (e = _earlyQueue.poll())) {
+                e.deliver(_sl);
+            }
+        }
     }
 
     abstract public void send(String message) throws Exception;

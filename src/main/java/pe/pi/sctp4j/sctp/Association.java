@@ -992,7 +992,7 @@ abstract public class Association {
                 m = new SCTPMessage(dco, s);
                 s.setAsNextMessage(m);
                 if (m.getSeq() != 0) {
-                    Log.warn("DCO should be the first message in a stream");
+                    Log.warn("DCO should be the first message in a stream was "+m.getSeq()+" type = dcep"+(dco.isAck()?"ACK":"OPEN"));
                 }
             } else {
                 Log.warn("Message too long " + bytes.length + " > " + this.maxMessageSize());

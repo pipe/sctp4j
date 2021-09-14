@@ -29,8 +29,6 @@ import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bouncycastle.tls.DatagramTransport;
 import org.junit.After;
 import org.junit.AfterClass;
@@ -358,8 +356,7 @@ public class ThreadedAssociationTest {
         MockAssociationListener listenLeft = new MockAssociationListener();
         MockAssociationListener listenRight = new MockAssociationListener() {
             @Override
-            public void onRawStream(SCTPStream s) {
-                super.onRawStream(s);
+            public void onDCEPStream(SCTPStream s, String label, int type) {
                 s.setSCTPStreamListener(rsl);
             }
         };
@@ -464,7 +461,7 @@ public class ThreadedAssociationTest {
 
     @Test
     public void testDCEPStreamSendMultiple() throws Exception {
-        Log.setLevel(Log.INFO);
+        //Log.setLevel(Log.INFO);
         System.out.println("---->testDCEPStreamSend strings");
 
         final ArrayList<String> rightout = new ArrayList();
@@ -556,7 +553,7 @@ public class ThreadedAssociationTest {
 
     @Test
     public void testDCEPStreamMultiple() throws Exception {
-        Log.setLevel(Log.INFO);
+        //Log.setLevel(Log.INFO);
         System.out.println("---->testDCEPStreamMultiple");
 
         final ArrayList<String> rightLabels = new ArrayList();
@@ -633,5 +630,60 @@ public class ThreadedAssociationTest {
         }
         //Log.setLevel(Log.NONE);
 
+    }
+        @Test
+    public void testEarlyMessage_String_BlockingSCTPStream() throws Exception {
+        System.out.println("---->earlyMessage string");
+        //Log.setLevel(Log.VERB);
+        final StringBuffer rightout = new StringBuffer();
+        final SCTPStreamListener rsl = new ASCTPStreamListener() {
+            @Override
+            public void onMessage(SCTPStream s, String message) {
+                rightout.append(message);
+                Log.debug("onmessage : " + message);
+                synchronized (rightout) {
+                    rightout.notify();
+                }
+            }
+        };
+        DatagramTransport trans[] = mkMockTransports();
+        MockAssociationListener listenLeft = new MockAssociationListener();
+        final SCTPStream [] rsa= new SCTPStream[1];
+        MockAssociationListener listenRight = new MockAssociationListener() {
+            @Override
+            public void onDCEPStream(SCTPStream s, String label, int type) {
+                 rsa[0] = s;
+            }
+        };
+        ThreadedAssociation instanceLeft = new ThreadedAssociation(trans[0], listenLeft);
+        ThreadedAssociation instanceRight = new ThreadedAssociation(trans[1], listenRight);
+        instanceLeft.associate();
+        synchronized (listenLeft) {
+            listenLeft.wait(2000);
+            assert (listenLeft.associated);
+            assert (listenRight.associated);
+        }
+        SCTPStream s = instanceLeft.mkStream("TestStream");
+        assert (s instanceof BlockingSCTPStream);
+        synchronized (rsa) {
+            rsa.wait(200);
+            assert (rsa[0] != null);
+            assert (rsa[0] instanceof BlockingSCTPStream);
+        }
+        String test = "Test message";
+        new Thread(() -> {
+            try {                
+                s.send(test);
+                Thread.sleep(500);
+                rsa[0].setSCTPStreamListener(rsl);
+            } catch (Exception ex) {
+                assert (false);
+            }
+        }).start();
+        synchronized (rightout) {
+            rightout.wait(2000);
+            assertEquals(test, rightout.toString());
+        }
+        //Log.setLevel(Log.WARN);
     }
 }
