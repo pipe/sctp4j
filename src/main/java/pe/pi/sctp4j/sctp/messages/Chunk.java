@@ -38,6 +38,7 @@ import pe.pi.sctp4j.sctp.messages.params.SupportedAddressTypes;
 import pe.pi.sctp4j.sctp.messages.params.Unknown;
 import pe.pi.sctp4j.sctp.messages.params.VariableParam;
 import com.phono.srtplight.Log;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -232,8 +233,9 @@ public abstract class Chunk {
         */
         // or use same data but different bytebuffers wrapping it 
         _body = pkt.slice();
-        _body.limit(length-4);
-        pkt.position(pkt.position()+(length -4));
+        ((Buffer)_body).limit(length-4);
+        Buffer bpkt = (Buffer)pkt;
+        bpkt.position(bpkt.position()+(length -4));
     }
 // sad ommission in ByteBuffer 
 
@@ -249,28 +251,30 @@ public abstract class Chunk {
         ret.put(_type);
         ret.put(_flags);
         ret.putChar((char) 4); // marker for length;
+        Buffer bret = (Buffer) ret;
         putFixedParams(ret);
         int pad = 0;
         if (_varList != null) {
             for (VariableParam v : this._varList) {
-                Log.debug("var " + v.getName() + " at " + ret.position());
+                Log.debug("var " + v.getName() + " at " + bret.position());
 
                 ByteBuffer var = ret.slice();
                 var.putChar((char) v.getType());
                 var.putChar((char) 4); // length holder.
                 v.writeBody(var);
-                var.putChar(2, (char) var.position());
-                Log.verb("setting var length to " + var.position());
-                pad = var.position() % 4;
+                Buffer bvar = (Buffer) var;
+                var.putChar(2, (char) bvar.position());
+                Log.verb("setting var length to " + bvar.position());
+                pad = bvar.position() % 4;
                 pad = (pad != 0) ? 4 - pad : 0;
                 Log.verb("padding by " + pad);
-                ret.position(ret.position() + var.position() + pad);
+                bret.position(bret.position() + bvar.position() + pad);
             }
         }
         //System.out.println("un padding by " + pad);
-        ret.position(ret.position() - pad);
+        bret.position(bret.position() - pad);
         // and push the new length into place.
-        ret.putChar(2, (char) ret.position());
+        ret.putChar(2, (char) bret.position());
         //System.out.println("setting chunk length to " + ret.position());
     }
 

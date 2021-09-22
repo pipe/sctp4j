@@ -22,6 +22,7 @@ import pe.pi.sctp4j.sctp.behave.UnorderedStreamBehaviour;
 import pe.pi.sctp4j.sctp.messages.Packet;
 import pe.pi.sctp4j.sctp.messages.exceptions.InvalidDataChunkException;
 import com.phono.srtplight.Log;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
 /**
@@ -125,9 +126,10 @@ public class DCOpen {
         buff.putChar((char) _labLen);
         buff.putChar((char) _protLen);
         buff.put(_label);
-        buff.position(buff.position() + pad(_labLen));
+        Buffer bu = (Buffer)buff; // work around for needless incompatibility between JDK 11 and 8
+        bu.position(bu.position() + pad(_labLen));
         buff.put(_protocol);
-        buff.position(buff.position() + pad(_protLen));
+        bu.position(bu.position() + pad(_protLen));
 
         return ret;
     }

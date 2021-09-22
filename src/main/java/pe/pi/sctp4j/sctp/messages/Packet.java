@@ -60,8 +60,8 @@ public class Packet {
      * @param pkt
      */
     public Packet(ByteBuffer pkt) throws SctpPacketFormatException, ChecksumException {
-        if (pkt.limit() < 12) {
-            throw new SctpPacketFormatException("SCTP packet too short expected 12 bytes, got " + pkt.limit());
+        if (((Buffer)pkt).limit() < 12) {
+            throw new SctpPacketFormatException("SCTP packet too short expected 12 bytes, got " + ((Buffer)pkt).limit());
         }
         checkChecksum(pkt); // if this isn't ok, then we dump the packet silently - by throwing an exception.
 
@@ -71,7 +71,7 @@ public class Packet {
         _chksum = pkt.getInt();
         _chunks = mkChunks(pkt);
 
-        pkt.rewind();
+        ((Buffer)pkt).rewind();
     }
 
     public Packet(int sp, int dp, int vertag) {
@@ -87,19 +87,21 @@ public class Packet {
         ret.putChar(_destPort);
         ret.putInt(_verTag);
         ret.putInt(_chksum);
+        Buffer bret = (Buffer)ret;
         int pad = 0;
         for (Chunk c : _chunks) {
             ByteBuffer cs = ret.slice();            // create a zero offset buffer to play in
             c.write(cs); // ask the chunk to write itself into there.
-            pad = cs.position() % 4;
+            Buffer bcs = (Buffer) cs;
+            pad = bcs.position() % 4;
             pad = (pad != 0) ? 4 - pad : 0;
             Log.verb("padding by " + pad);
-            ret.position(pad + ret.position() + cs.position());// move us along.
+            bret.position(pad + bret.position() + bcs.position());// move us along.
         }
         /*Log.verb("un padding by " + pad);
         ret.position(ret.position() - pad);*/
         
-        ret = (ByteBuffer) ((Buffer)ret).flip();
+        ret = (ByteBuffer) bret.flip();
         setChecksum(ret);
         return ret;
     }
@@ -121,7 +123,7 @@ public class Packet {
     }
 
     public static String getHex(ByteBuffer in) {
-        byte[] bin = new byte[in.limit()];
+        byte[] bin = new byte[((Buffer)in).limit()];
         in.get(bin);
         return getHex(bin, bin.length);
     }
@@ -179,7 +181,7 @@ public class Packet {
         byte b[] = new byte[4];
         pkt.putInt(SUMOFFSET, 0);
         Crc32c crc = new Crc32c();
-        crc.update(pkt.array(), pkt.arrayOffset(), pkt.limit());
+        crc.update(pkt.array(), pkt.arrayOffset(), ((Buffer)pkt).limit());
         long result = crc.getValue();
         b[0] = (byte) (result & 0xff);
         b[1] = (byte) ((result >> 8) & 0xff);

@@ -187,8 +187,8 @@ abstract public class Association {
                 }
             }
         }
-        byte[] res = new byte[unionbb.position()];
-        unionbb.rewind();
+        byte[] res = new byte[((Buffer)unionbb).position()];
+        ((Buffer)unionbb).rewind();
         unionbb.get(res);
         Log.verb("union of extensions contains :" + Chunk.chunksToNames(res));
         return res;
@@ -339,7 +339,7 @@ abstract public class Association {
         if ((c != null) && (c.length > 0)) {
             ByteBuffer obb = mkPkt(c);
             Log.verb("sending SCTP packet" + Packet.getHex(obb));
-            _transp.send(obb.array(), obb.arrayOffset(), obb.position());
+            _transp.send(obb.array(), obb.arrayOffset(), ((Buffer)obb).position());
         } else {
             Log.verb("Blocked empty packet send() - probably no response needed.");
         }
