@@ -104,7 +104,7 @@ public abstract class SCTPStream {
         send(ack);
     }
 
-    void alOnDCEPStream(SCTPStream _stream, String label, int _pPid) throws Exception {
+    protected void alOnDCEPStream(SCTPStream _stream, String label, int _pPid) throws Exception {
         _ass.alOnDCEPStream(_stream, label, _pPid);
     }
 
@@ -184,7 +184,6 @@ public abstract class SCTPStream {
         _sl = sl;
         if (_earlyQueue != null) {
             Log.debug("delivering early " + _earlyQueue.size() + " messages to "+sl.getClass().getSimpleName());
-
             SCTPMessage e = null;
             while (null != (e = _earlyQueue.poll())) {
                 e.deliver(_sl);

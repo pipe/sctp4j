@@ -24,6 +24,8 @@ import java.util.concurrent.Executors;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 import com.phono.srtplight.Log;
 import java.util.concurrent.ExecutorService;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import pe.pi.sctp4j.sctp.SCTPStreamListener;
 
 /**
@@ -68,7 +70,16 @@ public class BlockingSCTPStream extends SCTPStream {
     public void deliverMessage(SCTPMessage message) {
         _ex.execute(message);
     }
-
+    @Override
+    protected void alOnDCEPStream(SCTPStream _stream, String label, int _pPid) throws Exception {
+        _ex.execute(()-> {
+            try {
+                super.alOnDCEPStream(_stream, label, _pPid);
+            } catch (Exception ex) {
+                Log.error("can't notify  DCEPStream "+ex.getMessage());
+            }
+        });
+    }
     @Override
     public void delivered(DataChunk d) {
         int f = d.getFlags();

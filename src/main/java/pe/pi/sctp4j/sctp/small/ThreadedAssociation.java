@@ -157,7 +157,7 @@ public class ThreadedAssociation extends Association implements Runnable {
             _freeBlocks.add(dc);
         }
         resetCwnd();
-        retryThread = new Thread(this,"AssocRetry"+__assocNo);
+        retryThread = new Thread(this, "AssocRetry" + __assocNo);
         retryThread.start();
     }
 
@@ -219,6 +219,7 @@ public class ThreadedAssociation extends Association implements Runnable {
         Log.debug("Make new Blocking stream " + id);
         return new BlockingSCTPStream(this, id);
     }
+
     public SCTPStream mkStream(int sno, String label) throws StreamNumberInUseException, UnreadyAssociationException, SctpPacketFormatException, IOException, Exception {
         SCTPStream sout = super.mkStream(sno, label);
         if (sout != null) {
@@ -228,6 +229,7 @@ public class ThreadedAssociation extends Association implements Runnable {
         }
         return sout;
     }
+
     public long getT3() {
         return t3;
     }
@@ -288,7 +290,6 @@ public class ThreadedAssociation extends Association implements Runnable {
         }
     }
 
-   
     /**
      * try and create a sack packet - if we have any new acks to send or null if
      * we don't
@@ -357,7 +358,7 @@ public class ThreadedAssociation extends Association implements Runnable {
         setSsthresh(init);
         return super.inboundInit(init);
     }
-    
+
 
     /*
      B) Any time a DATA chunk is transmitted (or retransmitted) to a peer,
@@ -494,9 +495,9 @@ public class ThreadedAssociation extends Association implements Runnable {
                     }
                 }
             }
-       
+
             this._rwnd = sack.getArWin() - totalDataInFlight;
-            Log.debug("Setting rwnd to " + _rwnd+ " "+sack.getArWin() +" - "+ totalDataInFlight);
+            Log.debug("Setting rwnd to " + _rwnd + " " + sack.getArWin() + " - " + totalDataInFlight);
             boolean advanced = (_lastCumuTSNAck < ackedTo);
             adjustCwind(advanced, totalDataInFlight, totalAcked);
             _lastCumuTSNAck = ackedTo;
@@ -564,7 +565,7 @@ public class ThreadedAssociation extends Association implements Runnable {
             _cwnd -= sz;
         }
         Log.debug("MaySend " + maysend + " rwnd = " + _rwnd + " cwnd = " + _cwnd + " sz = " + sz);
-        */
+         */
         Log.debug("MaySend (simple version ignores cwnd)" + maysend + " rwnd = " + _rwnd + " sz = " + sz);
 
         return maysend;
@@ -696,19 +697,19 @@ public class ThreadedAssociation extends Association implements Runnable {
             if (canSend()) {
                 ArrayList<DataChunk> dcs = new ArrayList();
                 synchronized (_inFlight) {
-                    Log.verb("have "+ _inFlight.values().stream().count()+" data chunks in flight");
-                    Log.verb("have "+_inFlight.values().stream().mapToInt((d)-> d.getDataSize()).sum()+" data bytes in flight");
+                    Log.verb("have " + _inFlight.values().stream().count() + " data chunks in flight");
+                    Log.verb("have " + _inFlight.values().stream().mapToInt((d) -> d.getDataSize()).sum() + " data bytes in flight");
                     _inFlight.values().stream()
                             .filter((d) -> (d.getRetryTime() <= now))
                             .sorted().filter((d) -> !d.getGapAck()).forEachOrdered((d) -> {
-                                Log.verb("adding this to resend list " + d.toString());
-                                dcs.add(d);
-                            }
+                        Log.verb("adding this to resend list " + d.toString());
+                        dcs.add(d);
+                    }
                     );
                 }
 // this isn't efficient - lots of small packets. limit it to 5 for now
-                int count =0 ;
-                
+                int count = 0;
+
                 while (!dcs.isEmpty() && count < 5) {
                     DataChunk[] da = new DataChunk[1];
                     DataChunk d = dcs.remove(0);
@@ -725,12 +726,12 @@ public class ThreadedAssociation extends Association implements Runnable {
                             end.printStackTrace();
                         }
                         unexpectedClose(end);
-                        count =Integer.MAX_VALUE; // force exit
+                        count = Integer.MAX_VALUE; // force exit
                     } catch (Exception ex) {
                         Log.error("Cant send retry - eek " + ex.toString());
                     }
                 }
-                if (count > 0){
+                if (count > 0) {
                     setCwndPostRetrans();
                 }
             } else {
@@ -876,37 +877,36 @@ public class ThreadedAssociation extends Association implements Runnable {
 
         public ExecutorAssociationListener(AssociationListener al) {
             _appAl = al;
-            _ex = Executors.newSingleThreadExecutor((Runnable r) -> new Thread(r, "Assoc-" + (__assocNo-1) + "-Exec"));
+            _ex = Executors.newSingleThreadExecutor((Runnable r) -> new Thread(r, "Assoc-" + (__assocNo - 1) + "-Exec"));
         }
 
         @Override
         public void onAssociated(Association a) {
-           if (_appAl != null) {_ex.execute(() -> _appAl.onAssociated(a));}
+            if (_appAl != null) {
+                _ex.execute(() -> _appAl.onAssociated(a));
+            }
         }
 
         @Override
         public void onDisAssociated(Association a) {
-           if (_appAl != null) {_ex.execute(() -> _appAl.onDisAssociated(a));}
+            if (_appAl != null) {
+                _ex.execute(() -> _appAl.onDisAssociated(a));
+            }
         }
 
         @Override
         public void onDCEPStream(SCTPStream s, String label, int type) throws Exception {
-           if (_appAl != null) {_ex.execute(() -> {
-               try {
-                   _appAl.onDCEPStream(s,label,type);
-               } catch (Exception ex) {
-                   Log.warn("onDCEPStream threw exception "+ex.getMessage());
-               }
-           });}
+            // we do this on the SCTPStream's thread.
+            _appAl.onDCEPStream(s, label, type);
         }
 
         @Override
         public void onRawStream(SCTPStream s) {
-           if (_appAl != null) {_ex.execute(() -> _appAl.onRawStream(s));}
+            if (_appAl != null) {
+                // perhaps we should do the same here ?
+                _ex.execute(() -> _appAl.onRawStream(s));
+            }
         }
     }
-
-
-
 
 }
