@@ -182,12 +182,15 @@ public abstract class SCTPStream {
 
     public void setSCTPStreamListener(SCTPStreamListener sl) {
         _sl = sl;
+        Log.debug("adding listener for "+this._label+" of "+sl.getClass().getName());
         if (_earlyQueue != null) {
             Log.debug("delivering early " + _earlyQueue.size() + " messages to "+sl.getClass().getSimpleName());
             SCTPMessage e = null;
             while (null != (e = _earlyQueue.poll())) {
                 e.deliver(_sl);
             }
+        } else {
+            Log.debug("no early queue for "+_label);
         }
     }
 

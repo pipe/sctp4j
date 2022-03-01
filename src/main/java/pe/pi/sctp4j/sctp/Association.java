@@ -111,7 +111,7 @@ abstract public class Association {
      AUTH // Assume DTLS will cover this for us if we never send ASCONF packets.
      */
 
-    public static int COOKIESIZE = 32;
+    public static int COOKIESIZE = 40;
     private static long VALIDCOOKIELIFE = 60000;
     /*
      RTO.Initial - 3 seconds
@@ -633,6 +633,11 @@ abstract public class Association {
         cookie.cookieData = new byte[Association.COOKIESIZE];
         cookie.cookieTime = System.currentTimeMillis();
         _random.nextBytes(cookie.cookieData);
+        byte[] watermark = " |pi.pe|".getBytes();
+        int wlen = Math.min(watermark.length, cookie.cookieData.length);
+        for (int w=0;w<wlen;w++){
+            cookie.cookieData[w] = watermark[w]; // tell google who we are.
+        }
         iac.setCookie(cookie.cookieData);
         _cookies.add(cookie);
 

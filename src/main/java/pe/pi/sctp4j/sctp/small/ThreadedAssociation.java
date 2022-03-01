@@ -896,8 +896,13 @@ public class ThreadedAssociation extends Association implements Runnable {
 
         @Override
         public void onDCEPStream(SCTPStream s, String label, int type) throws Exception {
-            // we do this on the SCTPStream's thread.
-            _appAl.onDCEPStream(s, label, type);
+            if (_appAl != null) {_ex.execute(() -> {
+                try {
+                    _appAl.onDCEPStream(s,label,type);
+                } catch (Exception ex) {
+                    Log.warn("onDCEPStream threw exception "+ex.getMessage());
+                }
+            });}
         }
 
         @Override

@@ -346,7 +346,7 @@ public class ThreadedAssociationTest {
     @Test
     public void testMakeMessage_String_BlockingSCTPStream() throws Exception {
         System.out.println("---->makeMessage string");
-        //Log.setLevel(Log.VERB);
+        //Log.setLevel(Log.DEBUG);
         final StringBuffer rightout = new StringBuffer();
         final SCTPStreamListener rsl = new ASCTPStreamListener() {
             @Override
