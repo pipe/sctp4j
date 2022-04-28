@@ -21,7 +21,6 @@ import pe.pi.sctp4j.sctp.behave.SCTPStreamBehaviour;
 import pe.pi.sctp4j.sctp.messages.Chunk;
 import pe.pi.sctp4j.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
-import java.util.TreeSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.LinkedBlockingQueue;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
@@ -30,7 +29,7 @@ import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-public abstract class SCTPStream {
+public abstract class SCTPStream  {
 
     /* unfortunately a webRTC SCTP stream can change it's reliability rules etc post creation
      so we can't encapsulate the streams into multiple implementations of the same interface/abstract
@@ -50,11 +49,11 @@ public abstract class SCTPStream {
     private boolean closing;
     private State state = State.OPEN;
 
-    boolean InboundIsOpen() {
+    public boolean InboundIsOpen() {
         return ((state == State.OPEN) || (state == State.INBOUNDONLY));
     }
 
-    boolean OutboundIsOpen() {
+    public boolean OutboundIsOpen() {
         return ((state == State.OPEN) || (state == State.OUTBOUNDONLY));
     }
 

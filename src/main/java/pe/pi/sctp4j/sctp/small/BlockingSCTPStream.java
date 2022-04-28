@@ -59,7 +59,7 @@ public class BlockingSCTPStream extends SCTPStream {
     public void send(DCOpen message) throws Exception {
         SCTPMessage m = _ta.makeMessage(message, this);
         undeliveredOutboundMessages.put(m.getSeq(), m);
-        Log.debug("About to send message for dcep size is "+m.getData().length);
+        Log.debug("About to send message for dcep size is " + m.getData().length);
         _ta.sendAndBlock(m);
     }
 
@@ -67,16 +67,18 @@ public class BlockingSCTPStream extends SCTPStream {
     public void deliverMessage(SCTPMessage message) {
         _ex.execute(message);
     }
+
     @Override
     protected void alOnDCEPStream(SCTPStream _stream, String label, int _pPid) throws Exception {
-        _ex.execute(()-> {
+        _ex.execute(() -> {
             try {
                 super.alOnDCEPStream(_stream, label, _pPid);
             } catch (Exception ex) {
-                Log.error("can't notify  DCEPStream "+ex.getMessage());
+                Log.error("can't notify  DCEPStream " + ex.getMessage());
             }
         });
     }
+
     @Override
     public void delivered(DataChunk d) {
         int f = d.getFlags();
@@ -94,4 +96,12 @@ public class BlockingSCTPStream extends SCTPStream {
         return undeliveredOutboundMessages.isEmpty();
     }
 
+    @Override
+    public void close() throws Exception {
+        super.close();
+        if ((_ex != null) && (!_ex.isShutdown())) {
+            _ex.shutdownNow();
+            Log.warn("shutdown of Stream-" + this.getNum() + "-Exec");
+        }
+    }
 }

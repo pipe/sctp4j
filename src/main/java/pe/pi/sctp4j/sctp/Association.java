@@ -51,8 +51,6 @@ abstract public class Association {
 
     public abstract void associate() throws SctpPacketFormatException, IOException;
 
-
-
     /**
      * <code>
      *                     -----          -------- (from any state)
@@ -187,8 +185,8 @@ abstract public class Association {
                 }
             }
         }
-        byte[] res = new byte[((Buffer)unionbb).position()];
-        ((Buffer)unionbb).rewind();
+        byte[] res = new byte[((Buffer) unionbb).position()];
+        ((Buffer) unionbb).rewind();
         unionbb.get(res);
         Log.verb("union of extensions contains :" + Chunk.chunksToNames(res));
         return res;
@@ -339,7 +337,7 @@ abstract public class Association {
         if ((c != null) && (c.length > 0)) {
             ByteBuffer obb = mkPkt(c);
             Log.verb("sending SCTP packet" + Packet.getHex(obb));
-            _transp.send(obb.array(), obb.arrayOffset(), ((Buffer)obb).position());
+            _transp.send(obb.array(), obb.arrayOffset(), ((Buffer) obb).position());
         } else {
             Log.verb("Blocked empty packet send() - probably no response needed.");
         }
@@ -635,7 +633,7 @@ abstract public class Association {
         _random.nextBytes(cookie.cookieData);
         byte[] watermark = " |pi.pe|".getBytes();
         int wlen = Math.min(watermark.length, cookie.cookieData.length);
-        for (int w=0;w<wlen;w++){
+        for (int w = 0; w < wlen; w++) {
             cookie.cookieData[w] = watermark[w]; // tell google who we are.
         }
         iac.setCookie(cookie.cookieData);
@@ -923,16 +921,27 @@ abstract public class Association {
 
     public void unexpectedClose(EOFException end) {
         Log.debug("Unxepected association close " + end.getMessage());
-        try {
-            closeAllStreams();
-            _al.onDisAssociated(this);
-        } catch (Throwable t) {
-            Log.error("Threw " + t.getMessage() + " in unexpectedClose");
-            if (Log.getLevel() >= Log.DEBUG) {
-                t.printStackTrace();
+        if (_state != State.CLOSED) {
+            try {
+                closeAllStreams();
+            } catch (Throwable t) {
+                Log.error("can't close " + t.getMessage() + " in unexpectedClose");
+                if (Log.getLevel() >= Log.DEBUG) {
+                    t.printStackTrace();
+                }
             }
+            try {
+                _al.onDisAssociated(this);
+            } catch (Throwable t) {
+                Log.error("Can't dis " + t.getMessage() + " in unexpectedClose");
+                if (Log.getLevel() >= Log.DEBUG) {
+                    t.printStackTrace();
+                }
+            }
+            _state = State.CLOSED;
+        } else {
+            Log.warn("already closed. ");
         }
-        _state = State.CLOSED;
         _rcv = null;
 
     }
@@ -962,7 +971,6 @@ abstract public class Association {
     }
 
     //abstract public void sendAndBlock(SCTPMessage m) throws Exception;
-
     synchronized public SCTPMessage makeMessage(byte[] bytes, SCTPStream s) {
         SCTPMessage m = null;
         if (canSend()) {
@@ -997,7 +1005,7 @@ abstract public class Association {
                 m = new SCTPMessage(dco, s);
                 s.setAsNextMessage(m);
                 if (m.getSeq() != 0) {
-                    Log.warn("DCO should be the first message in a stream was "+m.getSeq()+" type = dcep"+(dco.isAck()?"ACK":"OPEN"));
+                    Log.warn("DCO should be the first message in a stream was " + m.getSeq() + " type = dcep" + (dco.isAck() ? "ACK" : "OPEN"));
                 }
             } else {
                 Log.warn("Message too long " + bytes.length + " > " + this.maxMessageSize());
@@ -1005,9 +1013,11 @@ abstract public class Association {
         }
         return m;
     }
+
     void alOnDCEPStream(SCTPStream _stream, String label, int _pPid) throws Exception {
         _al.onDCEPStream(_stream, label, _pPid);
     }
+
     abstract protected Chunk[] sackDeal(SackChunk sackChunk);
 
 }

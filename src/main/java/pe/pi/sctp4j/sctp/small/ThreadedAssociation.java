@@ -26,10 +26,12 @@ import com.phono.srtplight.Log;
 import java.io.EOFException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.bouncycastle.tls.DatagramTransport;
 import pe.pi.sctp4j.sctp.StreamNumberInUseException;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
@@ -272,6 +274,9 @@ public class ThreadedAssociation extends Association implements Runnable {
     }
 
     public synchronized void sendAndBlock(SCTPMessage m) throws Exception {
+        if (!this.isAssociated()) {
+            throw new IllegalStateException("not associated");
+        }
         while (m.hasMoreData()) {
             DataChunk dc = _freeBlocks.take();
             dc.clean();
@@ -282,7 +287,11 @@ public class ThreadedAssociation extends Association implements Runnable {
                 Log.verb("In congestion sync block ");
                 while (!this.maySend(dc.getDataSize())) {
                     Log.verb("about to wait for congestion for " + this.getT3());
-                    _congestion.wait(1000);// wholly wrong
+                    if (this.isAssociated()) {
+                        _congestion.wait(1000);// wholly wrong
+                    } else {
+                        throw new IllegalStateException("not associated");
+                    }
                 }
             }
             // todo check rollover - will break at maxint.
@@ -408,6 +417,14 @@ public class ThreadedAssociation extends Association implements Runnable {
      Recovery exitpoint (Section 7.2.4), Fast Recovery is exited.
 
      */
+    private void releaseAllBlocks() {
+        synchronized (_inFlight) {
+            Collection<DataChunk> vals = _inFlight.values();
+            _freeBlocks.addAll(vals);
+            _inFlight.clear();
+        }
+    }
+
     @Override
     protected Chunk[] sackDeal(SackChunk sack) {
         Chunk[] ret = {};
@@ -866,18 +883,24 @@ public class ThreadedAssociation extends Association implements Runnable {
 
     public void unexpectedClose(EOFException end) {
         super.unexpectedClose(end);
+        releaseAllBlocks();
+        synchronized (_congestion) {
+            _congestion.notifyAll();
+        }
         retryThread = null;
     }
 
     // takes the callback invocation off the rcv thread
-    private static class ExecutorAssociationListener implements AssociationListener {
+    private static class ExecutorAssociationListener implements AssociationListener, AutoCloseable {
 
         private final AssociationListener _appAl;
         private final ExecutorService _ex;
+        private int id = 0;
 
         public ExecutorAssociationListener(AssociationListener al) {
             _appAl = al;
-            _ex = Executors.newSingleThreadExecutor((Runnable r) -> new Thread(r, "Assoc-" + (__assocNo - 1) + "-Exec"));
+            id = __assocNo - 1;
+            _ex = Executors.newSingleThreadExecutor((Runnable r) -> new Thread(r, "Assoc-" + id + "-Exec"));
         }
 
         @Override
@@ -890,19 +913,37 @@ public class ThreadedAssociation extends Association implements Runnable {
         @Override
         public void onDisAssociated(Association a) {
             if (_appAl != null) {
-                _ex.execute(() -> _appAl.onDisAssociated(a));
+                if (_ex.isTerminated()) {
+                    Log.warn("Executor terminated... - direct call made..");
+                    _appAl.onDisAssociated(a);
+                } else {
+                    _ex.execute(() -> _appAl.onDisAssociated(a));
+                    try {
+                        _ex.awaitTermination(1000, TimeUnit.MILLISECONDS);
+                        this.close();
+                    } catch (Throwable x) {
+                        Log.warn("Timeout on " + this.toString());
+                        try {
+                            this.close();
+                        } catch (Throwable y) {
+                            ;
+                        }
+                    }
+                }
             }
         }
 
         @Override
         public void onDCEPStream(SCTPStream s, String label, int type) throws Exception {
-            if (_appAl != null) {_ex.execute(() -> {
-                try {
-                    _appAl.onDCEPStream(s,label,type);
-                } catch (Exception ex) {
-                    Log.warn("onDCEPStream threw exception "+ex.getMessage());
-                }
-            });}
+            if (_appAl != null) {
+                _ex.execute(() -> {
+                    try {
+                        _appAl.onDCEPStream(s, label, type);
+                    } catch (Exception ex) {
+                        Log.warn("onDCEPStream threw exception " + ex.getMessage());
+                    }
+                });
+            }
         }
 
         @Override
@@ -910,6 +951,14 @@ public class ThreadedAssociation extends Association implements Runnable {
             if (_appAl != null) {
                 // perhaps we should do the same here ?
                 _ex.execute(() -> _appAl.onRawStream(s));
+            }
+        }
+
+        @Override
+        public void close() throws Exception {
+            if ((_ex != null) && (!_ex.isShutdown())) {
+                _ex.shutdownNow();
+                Log.warn("shutdown of " + "Assoc-" + id + "-Exec");
             }
         }
     }
