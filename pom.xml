@@ -4,7 +4,7 @@
 
     <groupId>pe.pi</groupId>
     <artifactId>sctp4j</artifactId>
-    <version>1.0.4-TEST</version>
+    <version>1.0.4</version>
     <packaging>jar</packaging>
 
     <name>sctp4j</name>
