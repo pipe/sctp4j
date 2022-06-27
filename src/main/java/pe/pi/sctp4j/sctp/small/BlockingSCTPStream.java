@@ -101,7 +101,7 @@ public class BlockingSCTPStream extends SCTPStream {
         super.close();
         if ((_ex != null) && (!_ex.isShutdown())) {
             _ex.shutdownNow();
-            Log.warn("shutdown of Stream-" + this.getNum() + "-Exec");
+            Log.debug("shutdown of Stream-" + this.getNum() + "-Exec");
         }
     }
 }
