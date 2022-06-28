@@ -30,8 +30,6 @@ import java.util.Vector;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.bouncycastle.tls.DatagramTransport;
 import org.bouncycastle.util.Arrays;
 import org.junit.After;
@@ -352,7 +350,7 @@ public class ThreadedAssociationTest {
             @Override
             public void onMessage(SCTPStream s, String message) {
                 rightout.append(message);
-                Log.debug("onmessage : " + message);
+                Log.info("onmessage : " + message);
                 synchronized (rightout) {
                     rightout.notify();
                 }
