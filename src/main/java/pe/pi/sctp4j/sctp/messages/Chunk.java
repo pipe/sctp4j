@@ -40,8 +40,13 @@ import pe.pi.sctp4j.sctp.messages.params.VariableParam;
 import com.phono.srtplight.Log;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
+import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  *
@@ -196,27 +201,39 @@ public abstract class Chunk {
      --------------------------------------------------------------
      0x81    Packet Drop Chunk        (PKTDROP)
      */
-
-    final static HashMap<Integer, String> _typeLookup;//= //{"DATA", "INIT", "INIT ACK", "SACK", "HEARTBEAT", "HEARTBEAT ACK", "ABORT", "SHUTDOWN", "SHUTDOWN ACK", "ERROR", "COOKIE ECHO", "COOKIE ACK", "ECNE", "CWR", "SHUTDOWN COMPLETE","AUTH"};
+ final static Map<Integer, String> _typeLookup
+            = Collections.unmodifiableMap(Stream.of(
+                    new AbstractMap.SimpleEntry<>(0,"DATA"),
+                    new AbstractMap.SimpleEntry<>(1,"INIT"), 
+                    new AbstractMap.SimpleEntry<>(2,"INIT ACK"),
+                    new AbstractMap.SimpleEntry<>(3,"SACK"), 
+                    new AbstractMap.SimpleEntry<>(4,"HEARTBEAT"),
+                    new AbstractMap.SimpleEntry<>(5, "HEARTBEAT ACK"),
+                    new AbstractMap.SimpleEntry<>(6, "ABORT"),
+                    new AbstractMap.SimpleEntry<>(7, "SHUTDOWN"),
+                    new AbstractMap.SimpleEntry<>(8, "SHUTDOWN ACK"),
+                    new AbstractMap.SimpleEntry<>(9, "ERROR"),
+                    new AbstractMap.SimpleEntry<>(10, "COOKIE ECHO"),
+                    new AbstractMap.SimpleEntry<>(11, "COOKIE ACK"),
+                    new AbstractMap.SimpleEntry<>(12, "ECNE"),
+                    new AbstractMap.SimpleEntry<>(13, "CWR"),
+                    new AbstractMap.SimpleEntry<>(14, "SHUTDOWN COMPLETE"),
+                    new AbstractMap.SimpleEntry<>(15, "AUTH"),
+                    new AbstractMap.SimpleEntry<>(0xC1, "ASCONF"),
+                    new AbstractMap.SimpleEntry<>(0x80, "ASCONF-ACK"),
+                    new AbstractMap.SimpleEntry<>(130, "RE-CONFIG"),
+                    new AbstractMap.SimpleEntry<>(192, "FORWARDTSN"),
+                    new AbstractMap.SimpleEntry<>(0x81, "PKTDROP")
+                                ).collect(Collectors.toMap((e) -> e.getKey(), (e) -> e.getValue())));
+    final static Map<String, Integer> __nameMap = _typeLookup.entrySet().stream().collect(Collectors.toMap(
+            e -> e.getValue(),
+            e -> e.getKey()));
     byte _type;
     byte _flags;
     int _length;
     ByteBuffer _body;
     ArrayList<VariableParam> _varList = new ArrayList<VariableParam>();
 
-    static {
-        _typeLookup = new HashMap();
-        String[] names4960 = {"DATA", "INIT", "INIT ACK", "SACK", "HEARTBEAT", "HEARTBEAT ACK", "ABORT", "SHUTDOWN", "SHUTDOWN ACK", "ERROR", "COOKIE ECHO", "COOKIE ACK", "ECNE", "CWR", "SHUTDOWN COMPLETE", "AUTH"};
-        for (int i = 0; i < names4960.length; i++) {
-            _typeLookup.put(new Integer(i), names4960[i]);
-        }
-        _typeLookup.put(new Integer(0xC1), "ASCONF");
-        _typeLookup.put(new Integer(0x80), "ASCONF-ACK");
-        _typeLookup.put(new Integer(130), "RE-CONFIG");
-        _typeLookup.put(new Integer(192), "FORWARDTSN");
-        _typeLookup.put(new Integer(0x81), "PKTDROP");
-
-    }
 
     protected Chunk(byte type) {
         _type = type;
