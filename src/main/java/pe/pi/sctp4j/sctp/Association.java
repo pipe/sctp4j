@@ -133,8 +133,8 @@ abstract public class Association {
     private long _winCredit;
     private long _farTSN;
     private int MAXSTREAMS = 1000;
-    private int _maxOutStreams;
-    private int _maxInStreams;
+    private int _maxOutStreams = 256;
+    private int _maxInStreams =256;
     final static int MAXBUFF = 128 * 1024;
     public long _nearTSN;
     private int _srcPort;

@@ -236,6 +236,46 @@ public class ThreadedAssociation extends Association implements Runnable {
         return t3;
     }
 
+    public void enqueue(DataChunk[] ds) {
+
+        // todo - this worries me - 2 nested synchronized 
+        Log.verb(" Aspiring to enqueue " + ds[0].toString());
+
+        synchronized (this) {
+            long now = System.currentTimeMillis();
+            for (DataChunk d : ds) {
+                d.setTsn(_nearTSN++);
+                d.setGapAck(false);
+                d.setRetryTime(now + getT3() - 1);
+                d.setSentTime(now);
+                reduceRwnd(d.getDataSize());
+                //_outbound.put(new Long(d.getTsn()), d);
+                Log.verb(" DataChunk enqueued " + d.toString());
+                // all sorts of things wrong here - being in a synchronized not the least of them
+            }
+            Chunk[] toSend = ds;
+
+            try {
+                send(toSend);
+                for (DataChunk d : ds) {
+                    Log.verb("sent, syncing on inFlight... " + d.getTsn());
+                    synchronized (_inFlight) {
+                        _inFlight.put(new Long(d.getTsn()), d);
+                    }
+                    Log.verb("added to inFlight... " + d.getTsn());
+                }
+            } catch (SctpPacketFormatException ex) {
+                Log.error("badly formatted chunks " +ex);
+            } catch (java.io.EOFException end) {
+                unexpectedClose(end);
+            } catch (IOException ex) {
+                Log.error("Can not send chunks ");
+            }
+        }
+        Log.verb("leaving enqueue" + ds[0].getTsn());
+
+    }
+
     @Override
     public void enqueue(DataChunk d) {
         // todo - this worries me - 2 nested synchronized 
