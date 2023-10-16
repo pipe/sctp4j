@@ -82,6 +82,9 @@ public abstract class SCTPStream  {
                 + ((_sl != null) ? _sl.getClass().getSimpleName() : "null");
     }
 
+    public String getBehave(){
+        return  (_behave==null)?"unknown":_behave.getClass().getSimpleName();
+    }
     /*
     void send(SCTPMessage mess)  {
         try {
