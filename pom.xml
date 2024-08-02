@@ -4,7 +4,7 @@
 
     <groupId>pe.pi</groupId>
     <artifactId>sctp4j</artifactId>
-    <version>1.0.6-SNAPSHOT</version>
+    <version>1.0.6</version>
     <packaging>jar</packaging>
 
     <name>sctp4j</name>
@@ -65,7 +65,7 @@
         <dependency>
             <groupId>com.phono</groupId>
             <artifactId>srtplight</artifactId>
-            <version>1.1.10</version>
+            <version>1.1.11</version>
         </dependency>
     </dependencies>
     <distributionManagement>
