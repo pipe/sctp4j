@@ -184,7 +184,8 @@ public class DCOpen {
     }
 
     public SCTPStreamBehaviour mkStreamBehaviour() {
-        Log.debug("Making a behaviour for dcep stream " + new String(_label));
+        String loglab = _label == null?"_null_":new String(_label);
+        Log.debug("Making a behaviour for dcep stream " + loglab);
         SCTPStreamBehaviour behave = null;
         switch (_chanType) {
             case RELIABLE:
@@ -205,7 +206,7 @@ public class DCOpen {
                 break;
         }
         if (behave != null) {
-            Log.debug(new String(_label) + " behaviour is " + behave.getClass().getSimpleName());
+            Log.debug(loglab + " behaviour is " + behave.getClass().getSimpleName());
         }
 
         return behave;

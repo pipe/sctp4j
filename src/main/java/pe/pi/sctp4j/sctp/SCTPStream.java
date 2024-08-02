@@ -73,6 +73,7 @@ public abstract class SCTPStream  {
         return _sl;
     }
 
+    @Override
     public String toString() {
         return this.getClass().getSimpleName()
                 + "[" + this._sno + "]"
@@ -132,7 +133,7 @@ public abstract class SCTPStream  {
     }
 
     public Integer getNum() {
-        return new Integer(_sno);
+        return _sno;
     }
 
     public Chunk[] append(DataChunk dc) {
@@ -158,7 +159,7 @@ public abstract class SCTPStream  {
      * @param chunk
      */
     public void outbound(DataChunk chunk) {
-        chunk.setStreamId(_sno.intValue());
+        chunk.setStreamId(_sno);
         // roll seqno here.... hopefully....
     }
 

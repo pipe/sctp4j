@@ -199,6 +199,8 @@ public class SCTPMessage implements Runnable {
             }
         } catch (Exception x) {
             Log.error("Problem with DCOpen " + x.getMessage());
+            if (Log.getLevel() >= Log.DEBUG) {x.printStackTrace();}
+
         }
     }
 
