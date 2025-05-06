@@ -154,13 +154,17 @@ public class ThreadedAssociation extends Association implements Runnable {
         _freeBlocks = new ArrayBlockingQueue(MAXBLOCKS);
         _inFlight = new HashMap(MAXBLOCKS);
 
-        for (int i = 0; i < MAXBLOCKS; i++) {
-            DataChunk dc = new DataChunk();
-            _freeBlocks.add(dc);
-        }
         resetCwnd();
         retryThread = new Thread(this, "AssocRetry" + __assocNo);
         retryThread.start();
+    }
+
+    void makeFree() {
+        // this is the first time we know which we will do.
+        for (int i = 0; i < MAXBLOCKS; i++) {
+            DataChunk dc = this.interleaving ? new IDataChunk() : new ClassicDataChunk();
+            _freeBlocks.add(dc);
+        }
     }
 
     /*
@@ -180,6 +184,7 @@ public class ThreadedAssociation extends Association implements Runnable {
         _stashCookieEcho = ret;
         _rwnd = iack.getAdRecWinCredit();
         _ssthresh = _rwnd;
+        makeFree();
         return ret;
     }
 
@@ -265,7 +270,7 @@ public class ThreadedAssociation extends Association implements Runnable {
                     Log.verb("added to inFlight... " + d.getTsn());
                 }
             } catch (SctpPacketFormatException ex) {
-                Log.error("badly formatted chunks " +ex);
+                Log.error("badly formatted chunks " + ex);
             } catch (java.io.EOFException end) {
                 unexpectedClose(end);
             } catch (IOException ex) {
@@ -405,7 +410,10 @@ public class ThreadedAssociation extends Association implements Runnable {
         Log.debug("Inited rwnd to " + _rwnd);
 
         setSsthresh(init);
-        return super.inboundInit(init);
+        Chunk[] ret = super.inboundInit(init);
+        makeFree();
+        return ret;
+
     }
 
 

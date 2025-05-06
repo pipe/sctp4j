@@ -39,6 +39,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 import static org.junit.Assert.*;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
+import pe.pi.sctp4j.sctp.messages.ClassicDataChunk;
 import pe.pi.sctp4j.sctp.messages.DataChunk;
 
 /**
@@ -302,13 +303,13 @@ public class ThreadedAssociationTestEarlies {
         // SCTPStream s = instanceLeft.mkStream("TestStream");
         DataChunk earlies[] = new DataChunk[2];
         DCOpen dcop = new DCOpen("TestStream");
-        DataChunk dco = new DataChunk();
+        DataChunk dco = new ClassicDataChunk();
         dco.setData(dcop.getBytes());
         dco.setPpid(DataChunk.WEBRTCCONTROL);
         dco.setFlags(DataChunk.SINGLEFLAG);
         dco.setsSeqNo(0);
 
-        DataChunk single = new DataChunk();
+        DataChunk single = new ClassicDataChunk();
         final String test = "Test String";
         single.setData(test.getBytes());
         single.setPpid(DataChunk.WEBRTCSTRING);

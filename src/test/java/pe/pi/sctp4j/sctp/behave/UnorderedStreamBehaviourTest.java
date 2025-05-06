@@ -34,6 +34,7 @@ import org.junit.BeforeClass;
 import static org.junit.Assert.*;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
 import pe.pi.sctp4j.sctp.dummy.DummyStream;
+import pe.pi.sctp4j.sctp.messages.ClassicDataChunk;
 
 /**
  *
@@ -114,7 +115,7 @@ public class UnorderedStreamBehaviourTest {
         System.out.println("--> deliver single");
         SCTPStream s = mockStream();
         SortedSet<DataChunk> stash = new TreeSet();
-        DataChunk single = new DataChunk();
+        DataChunk single = new ClassicDataChunk();
         final String testString = "Test String";
         single.setData(testString.getBytes());
         single.setPpid(DataChunk.WEBRTCSTRING);
@@ -155,7 +156,7 @@ public class UnorderedStreamBehaviourTest {
     void dontDeliverOnePart(int flag) {
         SCTPStream s = mockStream();
         SortedSet<DataChunk> stash = new TreeSet();
-        DataChunk single = new DataChunk();
+        DataChunk single = new ClassicDataChunk();
         final String testString = "Test String";
         single.setData(testString.getBytes());
         single.setPpid(DataChunk.WEBRTCSTRING);
@@ -181,7 +182,7 @@ public class UnorderedStreamBehaviourTest {
         ArrayList<String> result = new ArrayList<String>();
         int n = 0;
         for (String ts : testStrings) {
-            DataChunk single = new DataChunk();
+            DataChunk single = new ClassicDataChunk();
             single.setTsn(_tsn++);
             single.setsSeqNo(0);
             single.setData(ts.getBytes());
@@ -229,7 +230,7 @@ public class UnorderedStreamBehaviourTest {
         int n = 0;
         StringBuffer bs = new StringBuffer();
         for (String ts : testStrings) {
-            DataChunk single = new DataChunk();
+            DataChunk single = new ClassicDataChunk();
             single.setTsn(_tsn++);
             single.setsSeqNo(0);
             single.setData(ts.getBytes());
@@ -260,7 +261,7 @@ public class UnorderedStreamBehaviourTest {
         int expectedToRemain = 0;
         for (String ts : testStrings) {
             for (int i = 0; i < ts.length(); i++) {
-                DataChunk single = new DataChunk();
+                DataChunk single = new ClassicDataChunk();
                 single.setsSeqNo(n);
                 single.setTsn(_tsn++);
                 String letter = ts.substring(i, i + 1);
@@ -333,7 +334,7 @@ public class UnorderedStreamBehaviourTest {
         ArrayList<DataChunk> all = new ArrayList<DataChunk>();
         for (String ts : testStrings) {
             for (int i = 0; i < ts.length(); i++) {
-                DataChunk single = new DataChunk();
+                DataChunk single = new ClassicDataChunk();
                 single.setsSeqNo(n);
                 single.setTsn(_tsn++);
                 String letter = ts.substring(i, i + 1);

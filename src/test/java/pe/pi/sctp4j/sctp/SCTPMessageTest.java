@@ -151,7 +151,7 @@ public class SCTPMessageTest {
         SCTPMessage instance = new SCTPMessage(testString, _fakeStream);
         TreeSet<DataChunk> chunks = new TreeSet<DataChunk>();
         while (instance.hasMoreData()) {
-            DataChunk dc = new DataChunk();
+            DataChunk dc = new ClassicDataChunk();
             instance.fill(dc);
             chunks.add(dc);
         }
@@ -167,7 +167,7 @@ public class SCTPMessageTest {
         SCTPMessage instance = new SCTPMessage(testBlob, _fakeStream);
         TreeSet<DataChunk> chunks = new TreeSet<DataChunk>();
         while (instance.hasMoreData()) {
-            DataChunk dc = new DataChunk();
+            DataChunk dc = new ClassicDataChunk();
             instance.fill(dc);
             chunks.add(dc);
         }
@@ -189,7 +189,7 @@ public class SCTPMessageTest {
         long tsn = 111;
 
         while (instance.hasMoreData()) {
-            DataChunk dc = new DataChunk();
+            DataChunk dc = new ClassicDataChunk();
             dc.setTsn(tsn++);
             instance.fill(dc);
             chunks.add(dc);
@@ -209,7 +209,7 @@ public class SCTPMessageTest {
         long tsn = 111;
 
         while (instance.hasMoreData()) {
-            DataChunk dc = new DataChunk();
+            DataChunk dc = new ClassicDataChunk();
             dc.setTsn(tsn++);
             instance.fill(dc);
             chunks.add(dc);
@@ -230,7 +230,7 @@ public class SCTPMessageTest {
         long tsn = 111;
 
         while (instance.hasMoreData()) {
-            DataChunk dc = new DataChunk();
+            DataChunk dc = new ClassicDataChunk();
             dc.setTsn(tsn++);
             instance.fill(dc);
             chunks.add(dc);

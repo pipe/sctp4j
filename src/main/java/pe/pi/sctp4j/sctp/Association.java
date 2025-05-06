@@ -97,15 +97,13 @@ abstract public class Association {
         SHUTDOWNACKSENT, CLOSED
     };
 
-    private byte[] _supportedExtensions = {(byte) Chunk.RE_CONFIG};
+    private byte[] _supportedExtensions = {(byte) Chunk.RE_CONFIG, (byte) Chunk.I_FORWARD_TSN,(byte)Chunk.I_DATA};
     /*
      For what it is worth, here's the logic as to why we don't have any supported extensions.
      { 
      ASCONF, // this is ICE's job so we never send ASCONF or 
      ASCONF-ACK, // ASCONF-ACK
-     FORWARDTSN, // we may end up wanting this - it supports partial reliability - aka giving up..
      PKTDROP, // thie is an optional performance enhancement especially valuable for middleboxes (we aren't one)
-     RE-CONFIG, // not sure about this - but lets assume for now that the w3c interface doesn't support stream resets.
      AUTH // Assume DTLS will cover this for us if we never send ASCONF packets.
      */
 
@@ -134,7 +132,7 @@ abstract public class Association {
     private long _farTSN;
     private int MAXSTREAMS = 1000;
     private int _maxOutStreams = 256;
-    private int _maxInStreams =256;
+    private int _maxInStreams = 256;
     final static int MAXBUFF = 128 * 1024;
     public long _nearTSN;
     private int _srcPort;
@@ -150,6 +148,8 @@ abstract public class Association {
 
     private String peerId;
 
+    protected boolean interleaving = false;
+    
     class CookieHolder {
 
         byte[] cookieData;
@@ -175,12 +175,18 @@ abstract public class Association {
 
     byte[] getUnionSupportedExtensions(byte far[]) {
         ByteBuffer unionbb = ByteBuffer.allocate(far.length);
+        if (Log.getLevel() >= Log.INFO) {
+            StringBuilder extnames = new StringBuilder("Supported Extensions: ");
+            for (byte x : _supportedExtensions) {
+                extnames.append("\n\t").append(Chunk.typeLookup(x));
+            }
+            Log.info(extnames.toString());
+        }
         for (int f = 0; f < far.length; f++) {
-            Log.verb("offered extension " + Chunk.typeLookup(far[f]));
+            Log.info("offered extension " + Chunk.typeLookup(far[f]));
             for (int n = 0; n < _supportedExtensions.length; n++) {
-                Log.verb("supported extension " + Chunk.typeLookup(_supportedExtensions[n]));
                 if (_supportedExtensions[n] == far[f]) {
-                    Log.verb("matching extension " + Chunk.typeLookup(_supportedExtensions[n]));
+                    Log.info("matching extension " + Chunk.typeLookup(_supportedExtensions[n]));
                     unionbb.put(far[f]);
                 }
             }
@@ -188,6 +194,12 @@ abstract public class Association {
         byte[] res = new byte[((Buffer) unionbb).position()];
         ((Buffer) unionbb).rewind();
         unionbb.get(res);
+        for(byte b:res){
+            if (b == (byte) Chunk.I_DATA){
+                interleaving = true;
+                break;
+            }
+        }
         Log.verb("union of extensions contains :" + Chunk.chunksToNames(res));
         return res;
     }
@@ -378,10 +390,12 @@ abstract public class Association {
         boolean ret = true;
         State oldState = _state;
         Chunk[] reply = null;
+        //Log.info("inbound Chunk of type "+Chunk.typeLookup((byte)ty));
         switch (ty) {
             case Chunk.INIT:
                 if (acceptableStateForInboundInit()) {
                     InitChunk init = (InitChunk) c;
+                    Log.info("got init "+init.toString());
                     reply = inboundInit(init);
                 } else {
                     Log.debug("Got an INIT when state was " + _state.name() + " - ignoring it for now ");
@@ -410,6 +424,7 @@ abstract public class Association {
                 }
                 break;
             case Chunk.DATA:
+            case Chunk.I_DATA:
                 Log.debug("got data " + c.toString());
                 reply = dataDeal((DataChunk) c);
                 break;
@@ -477,6 +492,7 @@ abstract public class Association {
                     ob.getChunkList().add(r);
                 }
                 );
+        //Log.info(ob.getChunkList().stream().map((c) -> c.typeLookup()).reduce("Sending chunks: ",(a,b)-> a+"\n\t"+b));
         ByteBuffer obb = ob.getByteBuffer();
         return obb;
     }
@@ -544,6 +560,7 @@ abstract public class Association {
         c.setNumOutStreams(this.MAXSTREAMS);
         c.setAdRecWinCredit(this.MAXBUFF);
         c.setInitiate(this.getMyVerTag());
+        c.setSupportedExtensions(_supportedExtensions);
         Chunk[] s = new Chunk[1];
         s[0] = c;
         this._state = State.COOKIEWAIT;
@@ -642,6 +659,9 @@ abstract public class Association {
         byte[] fse = init.getFarSupportedExtensions();
         if (fse != null) {
             iac.setSupportedExtensions(this.getUnionSupportedExtensions(fse));
+        }
+        if (init.isFarForwardTSNsupported()){
+            iac.setForwardTSNsupported(true);
         }
         reply = new Chunk[1];
         reply[0] = iac;

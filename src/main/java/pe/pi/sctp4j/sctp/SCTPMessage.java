@@ -37,6 +37,7 @@ public class SCTPMessage implements Runnable {
     private SCTPStreamListener _li;
     private boolean _delivered;
     private Runnable onAcked;
+    private int _fsn =0;
 
     /**
      * Outbound message - note that we assume no one will mess with data between
@@ -144,6 +145,8 @@ public class SCTPMessage implements Runnable {
         }
         dc.setPpid(_pPid);
         dc.setsSeqNo(_mseq);
+        dc.setFsn(_fsn);
+        _fsn++;
         _stream.outbound(dc);
     }
 

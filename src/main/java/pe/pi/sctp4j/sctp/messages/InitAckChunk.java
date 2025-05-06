@@ -57,6 +57,7 @@ public class InitAckChunk extends Chunk {
     long _initialTSN;
     private byte[] _cookie;
     private byte[] _supportedExtensions;
+    private boolean _forwardTSNsupported;
 
     public InitAckChunk() {
         super((byte) INITACK);
@@ -166,6 +167,9 @@ public class InitAckChunk extends Chunk {
             se.setData(_supportedExtensions);
             _varList.add(se);
         }
+        if (_forwardTSNsupported){
+            _varList.add(new ForwardTSNsupported());
+        }
     }
 
     public byte[] getSupportedExtensions(byte[] v) {
@@ -174,6 +178,10 @@ public class InitAckChunk extends Chunk {
 
     public void setSupportedExtensions(byte[] v) {
         _supportedExtensions = v;
+    }
+
+    public void setForwardTSNsupported(boolean b) {
+        _forwardTSNsupported = b;
     }
 
 }

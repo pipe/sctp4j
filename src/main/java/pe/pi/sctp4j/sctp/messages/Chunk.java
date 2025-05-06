@@ -53,6 +53,7 @@ import java.util.stream.Stream;
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
 public abstract class Chunk {
+
     /*
      0                   1                   2                   3
      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -64,8 +65,8 @@ public abstract class Chunk {
      \                                                               \
      +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
      */
-
     public final static int DATA = 0;
+    public final static int I_DATA = 64;
     public final static int INIT = 1;
     public final static int INITACK = 2;
     public final static int SACK = 3;
@@ -77,8 +78,8 @@ public abstract class Chunk {
     public final static int COOKIE_ACK = 11;
     public final static int SHUTDOWN_COMPLETE = 14;
     public final static int RE_CONFIG = 130;
-
-
+    public final static int FORWARD_TSN = 192;
+    public final static int I_FORWARD_TSN = 194;
 
     static byte TBIT = 1;
 
@@ -90,7 +91,7 @@ public abstract class Chunk {
       Therefore, if the Chunk Value field is zero-length, the Length
       field will be set to 4.  The Chunk Length field does not count any
       chunk padding.
-    */
+     */
     static Chunk mkChunk(ByteBuffer pkt) {
         Chunk ret = null;
         if (pkt.remaining() >= 4) {
@@ -100,7 +101,10 @@ public abstract class Chunk {
             int itype = (int) (0xff & type);
             switch (itype) {
                 case DATA:
-                    ret = new DataChunk(type, flags, length, pkt);
+                    ret = new ClassicDataChunk(type, flags, length, pkt);
+                    break;
+                case I_DATA:
+                    ret = new IDataChunk(type, flags, length, pkt);
                     break;
                 case INIT:
                     ret = new InitChunk(type, flags, length, pkt);
@@ -126,8 +130,14 @@ public abstract class Chunk {
                 case RE_CONFIG:
                     ret = new ReConfigChunk(type, flags, length, pkt);
                     break;
+                case FORWARD_TSN:
+                    ret = new ForwardTSNChunk(type, flags, length, pkt);
+                    break;
+                case I_FORWARD_TSN:
+                    ret = new IForwardTSNChunk(type, flags, length, pkt);
+                    break;
                 default:
-                    Log.warn("Default chunk type "+itype+" read in ");
+                    Log.warn("Default chunk type " + itype + " read in ");
                     ret = new Chunk(type, flags, length, pkt) {
                         @Override
                         void putFixedParams(ByteBuffer ret) {
@@ -177,7 +187,7 @@ public abstract class Chunk {
      13         - Reserved for Congestion Window Reduced (CWR)
      14         - Shutdown Complete (SHUTDOWN COMPLETE)
      */
-    /*
+ /*
     
      Chunk Type  Chunk Name
      --------------------------------------------------------------
@@ -201,13 +211,13 @@ public abstract class Chunk {
      --------------------------------------------------------------
      0x81    Packet Drop Chunk        (PKTDROP)
      */
- final static Map<Integer, String> _typeLookup
+    final static Map<Integer, String> _typeLookup
             = Collections.unmodifiableMap(Stream.of(
-                    new AbstractMap.SimpleEntry<>(0,"DATA"),
-                    new AbstractMap.SimpleEntry<>(1,"INIT"), 
-                    new AbstractMap.SimpleEntry<>(2,"INIT ACK"),
-                    new AbstractMap.SimpleEntry<>(3,"SACK"), 
-                    new AbstractMap.SimpleEntry<>(4,"HEARTBEAT"),
+                    new AbstractMap.SimpleEntry<>(0, "DATA"),
+                    new AbstractMap.SimpleEntry<>(1, "INIT"),
+                    new AbstractMap.SimpleEntry<>(2, "INIT ACK"),
+                    new AbstractMap.SimpleEntry<>(3, "SACK"),
+                    new AbstractMap.SimpleEntry<>(4, "HEARTBEAT"),
                     new AbstractMap.SimpleEntry<>(5, "HEARTBEAT ACK"),
                     new AbstractMap.SimpleEntry<>(6, "ABORT"),
                     new AbstractMap.SimpleEntry<>(7, "SHUTDOWN"),
@@ -219,12 +229,14 @@ public abstract class Chunk {
                     new AbstractMap.SimpleEntry<>(13, "CWR"),
                     new AbstractMap.SimpleEntry<>(14, "SHUTDOWN COMPLETE"),
                     new AbstractMap.SimpleEntry<>(15, "AUTH"),
+                    new AbstractMap.SimpleEntry<>(I_DATA, "I-DATA"),
                     new AbstractMap.SimpleEntry<>(0xC1, "ASCONF"),
                     new AbstractMap.SimpleEntry<>(0x80, "ASCONF-ACK"),
                     new AbstractMap.SimpleEntry<>(130, "RE-CONFIG"),
-                    new AbstractMap.SimpleEntry<>(192, "FORWARDTSN"),
+                    new AbstractMap.SimpleEntry<>(192, "FORWARD TSN"),
+                    new AbstractMap.SimpleEntry<>(I_FORWARD_TSN, "I-FORWARD-TSN"),
                     new AbstractMap.SimpleEntry<>(0x81, "PKTDROP")
-                                ).collect(Collectors.toMap((e) -> e.getKey(), (e) -> e.getValue())));
+            ).collect(Collectors.toMap((e) -> e.getKey(), (e) -> e.getValue())));
     final static Map<String, Integer> __nameMap = _typeLookup.entrySet().stream().collect(Collectors.toMap(
             e -> e.getValue(),
             e -> e.getKey()));
@@ -233,7 +245,6 @@ public abstract class Chunk {
     int _length;
     ByteBuffer _body;
     ArrayList<VariableParam> _varList = new ArrayList<VariableParam>();
-
 
     protected Chunk(byte type) {
         _type = type;
@@ -247,12 +258,12 @@ public abstract class Chunk {
         byte bb[] = new byte[length -4]; 
         pkt.get(bb);
         _body = ByteBuffer.wrap(bb);
-        */
+         */
         // or use same data but different bytebuffers wrapping it 
         _body = pkt.slice();
-        ((Buffer)_body).limit(length-4);
-        Buffer bpkt = (Buffer)pkt;
-        bpkt.position(bpkt.position()+(length -4));
+        ((Buffer) _body).limit(length - 4);
+        Buffer bpkt = (Buffer) pkt;
+        bpkt.position(bpkt.position() + (length - 4));
     }
 // sad ommission in ByteBuffer 
 
@@ -307,14 +318,16 @@ public abstract class Chunk {
         }
         return ret;
     }
+
     public static String chunksToNames(byte[] fse) {
         StringBuffer ret = new StringBuffer();
-        for (byte f:fse){
+        for (byte f : fse) {
             ret.append(typeLookup(f));
             ret.append(" ");
         }
         return ret.toString();
     }
+
     public String toString() {
         return "Chunk : type " + typeLookup(_type) + " flags " + Integer.toHexString((0xff) & _flags) + " length = " + _length;
     }
@@ -326,6 +339,7 @@ public abstract class Chunk {
     int getLength() {
         return _length;
     }
+
     /*
     
      1	Heartbeat Info	[RFC4960]
@@ -362,7 +376,6 @@ public abstract class Chunk {
 
     
      */
-
     protected VariableParam readVariable() {
         int type = _body.getChar();
         int len = _body.getChar();
@@ -578,6 +591,11 @@ public abstract class Chunk {
 
     protected static class ForwardTSNsupported extends KnownParam {
 
+        public ForwardTSNsupported() {
+            this(49152, "ForwardTSNsupported");
+            this.setData(new byte[0]);
+        }
+
         public ForwardTSNsupported(int t, String n) {
             super(t, n);
         }
@@ -633,5 +651,4 @@ public abstract class Chunk {
             return super.toString() + ret;
         }
     }
-
 }

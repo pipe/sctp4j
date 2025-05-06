@@ -168,14 +168,15 @@ public class DCOpen {
             //break;
 
         }
+        Log.info("Dcep open "+ toString());
     }
 
     public String toString() {
-        return _isAck ? "Ack " : "Open "
+        return (_isAck ? "Ack " : "Open ")
                 + " _chanType =" + (int) _chanType
                 + " _priority = " + _priority
                 + " _reliablity = " + _reliablity
-                + " _label = " + new String(_label)
+                + " _label = " + (_label == null?"_null_":new String(_label))
                 + " _protocol = " + Packet.getHex(_protocol);
     }
 
@@ -184,8 +185,6 @@ public class DCOpen {
     }
 
     public SCTPStreamBehaviour mkStreamBehaviour() {
-        String loglab = _label == null?"_null_":new String(_label);
-        Log.debug("Making a behaviour for dcep stream " + loglab);
         SCTPStreamBehaviour behave = null;
         switch (_chanType) {
             case RELIABLE:
@@ -206,7 +205,7 @@ public class DCOpen {
                 break;
         }
         if (behave != null) {
-            Log.debug(loglab + " behaviour is " + behave.getClass().getSimpleName());
+            Log.info(" behaviour is " + behave.getClass().getSimpleName());
         }
 
         return behave;
