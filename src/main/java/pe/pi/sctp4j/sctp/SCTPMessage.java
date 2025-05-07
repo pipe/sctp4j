@@ -19,9 +19,11 @@ package pe.pi.sctp4j.sctp;
 import pe.pi.sctp4j.sctp.messages.DataChunk;
 import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
+import java.util.List;
 import java.util.SortedSet;
 import pe.pi.sctp4j.sctp.behave.SCTPStreamBehaviour;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
+import pe.pi.sctp4j.sctp.messages.IDataChunk;
 
 /**
  *
@@ -101,6 +103,28 @@ public class SCTPMessage implements Runnable {
         }
     }
 
+    
+    public SCTPMessage(SCTPStream s, List<IDataChunk> chunks) {
+        _stream = s;
+        int tot = 0;
+        if ((chunks.getFirst().getFlags() & DataChunk.BEGINFLAG) == 0) {
+            throw new IllegalArgumentException("must start with 'start' chunk");
+        }
+        if ((chunks.getLast().getFlags() & DataChunk.ENDFLAG) == 0) {
+            throw new IllegalArgumentException("must end with 'end' chunk");
+        }
+        _pPid = chunks.getFirst().getPpid();
+        for (IDataChunk dc : chunks) {
+            tot += dc.getDataSize();
+        }
+        _data = new byte[tot];
+        int offs = 0;
+        for (DataChunk dc : chunks) {
+            System.arraycopy(dc.getData(), 0, _data, offs, dc.getDataSize());
+            offs += dc.getDataSize();
+        }
+    }
+
     public void setCompleteHandler(MessageCompleteHandler mch) {
         throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
@@ -174,7 +198,9 @@ public class SCTPMessage implements Runnable {
         ByteBuffer bb = ByteBuffer.wrap(data);
         try {
             DCOpen dcep = new DCOpen(bb);
-            SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
+            Association a = _stream.getAssociation();
+            
+            SCTPStreamBehaviour behave = dcep.mkStreamBehaviour(a.interleaving);
             _stream.setBehave(behave);
             if (!dcep.isAck()) {
                 Log.debug("decp open  " + dcep.toString());

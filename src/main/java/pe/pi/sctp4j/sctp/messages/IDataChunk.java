@@ -48,31 +48,31 @@ public class IDataChunk extends DataChunk {
      */
     @Override
     void bodyParser(ByteBuffer body) {
-        if (_body.remaining() >= 12) {
-            _tsn = getUnsignedInt(_body);
-            _streamId = _body.getChar();
-            var reserved = _body.getChar();
-            _mid = _body.getInt();
-            var thing = _body.getInt();
+        if (body.remaining() >= 16) {
+            _tsn = getUnsignedInt(body);
+            _streamId = body.getChar();
+            var reserved = body.getChar();
+            _mid = body.getInt();
+            var thing = body.getInt();
             if ((_flags & DataChunk.BEGINFLAG) != 0) {
                 _ppid = thing;
                 _fsn = 0;
             } else {
                 _fsn = thing;
             }
-
+            
             Log.info(" _tsn : " + _tsn
                     + " _streamId : " + _streamId
-                    + " _sSeqNo : " + _sSeqNo
+                    + " _mid :"+ _mid
+                    + " _fsn : " + _fsn
                     + " _ppid : " + _ppid);
-            Log.debug("data size remaining " + _body.remaining());
-            try {
-                _data = getDataFromPkt(_ppid, _body);
-            } catch (InvalidDataChunkException ex) {
-                _invalid = ex;
-            }
+            Log.info("data size remaining " + body.remaining());
+
+            _data = new byte[body.remaining()];
+            body.get(_data);
             _dataOffset = 0;
             _dataLength = _data.length;
+
         }
     }
 
@@ -88,7 +88,7 @@ public class IDataChunk extends DataChunk {
             ret.putInt(_fsn);
         }
         ret.put(_data, _dataOffset, _dataLength);
-        Log.info("sending an idata " + this.toString());
+        //Log.info("sending an idata " + this.toString());
     }
 
     public IDataChunk() {
@@ -107,9 +107,21 @@ public class IDataChunk extends DataChunk {
     public void setFsn(int fsn) {
         _fsn = fsn;
     }
-    
+
     @Override
     public void setsSeqNo(int sSeqNo) {
         _mid = sSeqNo; // this is wrong because it _should_ be a separate counter for ordered vs unordered -and be 32 bits.... but for now...
+    }
+
+    public int getMid() {
+        return _mid;
+    }
+
+    public void setMid(int m) {
+        _mid = m;
+    }
+
+    public int getFsn() {
+        return _fsn;
     }
 }

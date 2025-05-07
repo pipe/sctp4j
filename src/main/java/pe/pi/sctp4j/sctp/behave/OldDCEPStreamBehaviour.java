@@ -64,7 +64,7 @@ public class OldDCEPStreamBehaviour implements
             messageNo++;
             s.setNextMessageSeqIn(messageNo);
             a.remove(dc);
-            SCTPStreamBehaviour behave = dcep.mkStreamBehaviour();
+            SCTPStreamBehaviour behave = dcep.mkStreamBehaviour(false);
             s.setBehave(behave);
             if (!dcep.isAck()) {
                 Log.debug("decp open  " + dcep.toString());

@@ -16,6 +16,8 @@
  */
 package pe.pi.sctp4j.sctp.dataChannel.DECP;
 
+import pe.pi.sctp4j.sctp.behave.IUnorderedStreamBehaviour;
+import pe.pi.sctp4j.sctp.behave.IOrderedStreamBehaviour;
 import pe.pi.sctp4j.sctp.behave.SCTPStreamBehaviour;
 import pe.pi.sctp4j.sctp.behave.OrderedStreamBehaviour;
 import pe.pi.sctp4j.sctp.behave.UnorderedStreamBehaviour;
@@ -184,24 +186,24 @@ public class DCOpen {
         return _isAck;
     }
 
-    public SCTPStreamBehaviour mkStreamBehaviour() {
+    public SCTPStreamBehaviour mkStreamBehaviour(boolean interleaving) {
         SCTPStreamBehaviour behave = null;
         switch (_chanType) {
             case RELIABLE:
-                behave = new OrderedStreamBehaviour();
+                behave = interleaving?new IOrderedStreamBehaviour():new OrderedStreamBehaviour();
                 break;
             case RELIABLE_UNORDERED:
-                behave = new UnorderedStreamBehaviour();
+                behave = interleaving?new IUnorderedStreamBehaviour():new UnorderedStreamBehaviour();
                 break;
             // todo these next 4 are wrong... the odering is atleast correct
             // even if the retry is wrong.
             case PARTIAL_RELIABLE_REXMIT:
             case PARTIAL_RELIABLE_TIMED:
-                behave = new OrderedStreamBehaviour();
+                behave = interleaving?new IOrderedStreamBehaviour():new OrderedStreamBehaviour();
                 break;
             case PARTIAL_RELIABLE_REXMIT_UNORDERED:
             case PARTIAL_RELIABLE_TIMED_UNORDERED:
-                behave = new UnorderedStreamBehaviour();
+                behave = interleaving?new IUnorderedStreamBehaviour():new UnorderedStreamBehaviour();
                 break;
         }
         if (behave != null) {

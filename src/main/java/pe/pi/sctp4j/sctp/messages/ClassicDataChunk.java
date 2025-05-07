@@ -27,19 +27,19 @@ public class ClassicDataChunk extends DataChunk {
 
     @Override
     void bodyParser(ByteBuffer body) {
-        if (_body.remaining() >= 12) {
-            _tsn = getUnsignedInt(_body);
-            _streamId = _body.getChar();
-            _sSeqNo = _body.getChar();
-            _ppid = _body.getInt();
+        if (body.remaining() >= 12) {
+            _tsn = getUnsignedInt(body);
+            _streamId = body.getChar();
+            _sSeqNo = body.getChar();
+            _ppid = body.getInt();
 
             Log.debug(" _tsn : " + _tsn
                     + " _streamId : " + _streamId
                     + " _sSeqNo : " + _sSeqNo
                     + " _ppid : " + _ppid);
-            Log.debug("data size remaining " + _body.remaining());
+            Log.debug("data size remaining " + body.remaining());
             try {
-                _data = getDataFromPkt(_ppid, _body);
+                _data = getDataFromPkt(_ppid, body);
             } catch (InvalidDataChunkException ex) {
                 _invalid = ex;
             }
