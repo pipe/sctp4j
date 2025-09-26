@@ -6,9 +6,8 @@ package pe.pi.sctp4j.sctp.messages;
 
 import com.phono.srtplight.Log;
 import java.nio.ByteBuffer;
+import pe.pi.sctp4j.sctp.Association;
 import static pe.pi.sctp4j.sctp.messages.Chunk.getUnsignedInt;
-import static pe.pi.sctp4j.sctp.messages.DataChunk.getDataFromPkt;
-import pe.pi.sctp4j.sctp.messages.exceptions.InvalidDataChunkException;
 
 /**
  *
@@ -18,6 +17,7 @@ public class IDataChunk extends DataChunk {
 
     private int _mid;
     private int _fsn;
+    private boolean ordered;
 
     public IDataChunk(byte type, byte flags, int length, ByteBuffer pkt) {
         super(type, flags, length, pkt);
@@ -123,5 +123,28 @@ public class IDataChunk extends DataChunk {
 
     public int getFsn() {
         return _fsn;
+    }
+
+
+    public boolean expired(Association par,long now) {
+        boolean ret = false;
+        var s = par.getStream(this._streamId);
+        if (!s.isReliable()){
+            Log.info("Checking expire on "+this.toString());
+            Long retries = s.getMaxRetries();
+            if (retries != null){
+                ret = (this._retryCount > retries);
+            } else {
+                Long maxtime = s.getMaxTime();
+                ret = ((now - this._sentTime)> maxtime);
+            }           
+            Log.info(" expire is "+ret);
+
+        }
+       this.ordered = s.isOrdered();
+       return ret;
+    }
+    boolean isOrdered(){
+        return ordered;
     }
 }

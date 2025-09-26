@@ -26,8 +26,13 @@ public class IOrderedStreamBehaviour implements SCTPStreamBehaviour {
     protected int expectedMessageNo = 1; // dcep is the zeroth message
     private final HashMap<Integer, MessageHolder> messages = new HashMap();
     private final Comparator<IDataChunk> fsnComparator;
+    private boolean reliable = true;
+    private Long maxRexmit;
+    private Long maxTimeout;
+    private final Integer priority;
 
-    public IOrderedStreamBehaviour() {
+    public IOrderedStreamBehaviour(int priority) {
+        this.priority = priority;
         fsnComparator = (IDataChunk o1, IDataChunk o2) -> (o1.getFsn() - o2.getFsn());
     }
 
@@ -100,6 +105,23 @@ public class IOrderedStreamBehaviour implements SCTPStreamBehaviour {
         return null;
     }
 
+    public SCTPStreamBehaviour withRexmit(long reliablity) {
+        this.reliable = false;
+        this.maxRexmit=reliablity;
+        return this;
+    }
+
+    public SCTPStreamBehaviour withTimed(long reliablity) {
+        this.reliable = false;
+        this.maxTimeout=reliablity;
+        return this;    
+    }
+
+    @Override
+    public boolean isOrdered() {
+        return ordered;
+    }
+
     class MessageHolder {
 
         HashMap<Integer, IDataChunk> frags = new HashMap();
@@ -136,4 +158,28 @@ public class IOrderedStreamBehaviour implements SCTPStreamBehaviour {
             return frags.values().stream().sorted(fsnComparator).toList();
         }
     };
+    
+        @Override
+    public boolean isReliable() {
+        return this.reliable;
+    }
+
+    @Override
+    public Long getMaxRetries() {
+        return this.maxRexmit;
+    }
+
+    @Override
+    public Long getMaxTime() {
+        return this.maxTimeout;
+    }
+
+    @Override
+    public Integer getPriority() {
+        return this.priority;
+    }
+    @Override
+    public String toString(){
+        return "behave :"+(ordered?"ordered":"unordered")+ "priority :"+priority+" "+(reliable?"reliable":"unreliable")+" timeout :"+maxTimeout+" retries :"+maxRexmit;
+    }
 }

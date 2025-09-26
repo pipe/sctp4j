@@ -36,4 +36,10 @@ public interface SCTPStreamBehaviour {
     // according to the appropriate behaviour.
     public void deliver(SCTPStream s, SortedSet<DataChunk> a, SCTPStreamListener l) ;
 
+    public boolean isReliable();
+    public Long getMaxRetries();
+    public Long getMaxTime();
+    public Integer getPriority();
+    public boolean isOrdered();
+    
 }

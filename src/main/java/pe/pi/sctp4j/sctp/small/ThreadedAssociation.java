@@ -44,7 +44,7 @@ import pe.pi.sctp4j.sctp.messages.exceptions.UnreadyAssociationException;
  */
 public class ThreadedAssociation extends Association implements Runnable {
 
-    final static int MAXBLOCKS = 100; // some number....
+    final static int MAXBLOCKS = 1000; // some number....
     private ArrayBlockingQueue<DataChunk> _freeBlocks;
     private HashMap<Long, DataChunk> _inFlight;
     private long _lastCumuTSNAck;
@@ -755,6 +755,7 @@ public class ThreadedAssociation extends Association implements Runnable {
     @Override
     public void run() {
         Log.verb("starting retry thread");
+        ArrayList<IDataChunk> expired = new ArrayList();
         while (retryThread != null) {
             long now = System.currentTimeMillis();
             long nextTime = now + t3;
@@ -772,32 +773,43 @@ public class ThreadedAssociation extends Association implements Runnable {
                     }
                     );
                 }
-// this isn't efficient - lots of small packets. limit it to 5 for now
+// this isn't efficient - lots of small packets. limit it to 50 for now
                 int count = 0;
-
-                while (!dcs.isEmpty() && count < 5) {
+                while (!dcs.isEmpty() && count < 50) {
                     DataChunk[] da = new DataChunk[1];
                     DataChunk d = dcs.remove(0);
                     da[0] = d;
                     d.setRetryTime(now + getT3() - 1);
                     d.incrementRetryCount();
-                    try {
-                        Log.debug("Sending retry for  " + d);
-                        this.send(da);
-                        count++;
-                    } catch (java.io.EOFException end) {
-                        if (Log.getLevel() >= Log.DEBUG) {
-                            Log.debug("Retry send failed " + end.getMessage());
-                            end.printStackTrace();
+                    if (interleaving && ((IDataChunk) d).expired((Association) this, now)) {
+                        Log.info("Expired chunk " + d.toString());
+                        expired.add((IDataChunk) d);
+                    } else {
+                        try {
+                            Log.debug("Sending retry for  " + d);
+                            this.send(da);
+                            count++;
+                        } catch (java.io.EOFException end) {
+                            if (Log.getLevel() >= Log.DEBUG) {
+                                Log.debug("Retry send failed " + end.getMessage());
+                                end.printStackTrace();
+                            }
+                            unexpectedClose(end);
+                            count = Integer.MAX_VALUE; // force exit
+                        } catch (Exception ex) {
+                            Log.error("Cant send retry - eek " + ex.toString());
                         }
-                        unexpectedClose(end);
-                        count = Integer.MAX_VALUE; // force exit
-                    } catch (Exception ex) {
-                        Log.error("Cant send retry - eek " + ex.toString());
                     }
                 }
                 if (count > 0) {
                     setCwndPostRetrans();
+                }
+                if (!expired.isEmpty()) {
+                    try {
+                        sendIForwardTSN(expired);
+                    } catch (Exception ex) {
+                        Log.error("Cant send IForwardTSN - eek " + ex.toString());
+                    }
                 }
             } else {
                 Log.verb("Can't send");
@@ -938,7 +950,37 @@ public class ThreadedAssociation extends Association implements Runnable {
         retryThread = null;
     }
 
-    // takes the callback invocation off the rcv thread
+    private void sendIForwardTSN(ArrayList<IDataChunk> d) throws SctpPacketFormatException, IOException {
+        fakeSacks(d);
+        IForwardTSNChunk ift = new IForwardTSNChunk();
+        ift.setExpired(d);
+        Chunk[] s = new Chunk[1];
+        s[0] = ift;
+        this.send(s);
+    }
+
+    private void fakeSacks(ArrayList<IDataChunk> dl) {
+        Log.info("Faking a sacks for " + dl.size());
+        synchronized (this._inFlight) {
+            for (IDataChunk d : dl) {
+                _inFlight.remove(d.getTsn());
+                try {
+                    _freeBlocks.put(d);
+                } catch (InterruptedException ex) {
+                    Log.error("Cant return freeblock");
+                }
+            }
+        }
+        for (IDataChunk d : dl) {
+            int sid = d.getStreamId();
+            SCTPStream stream = getStream(sid);
+            if (stream != null) {
+                stream.expired(d.getMid());
+            }
+        }
+    }
+
+// takes the callback invocation off the rcv thread
     private static class ExecutorAssociationListener implements AssociationListener, AutoCloseable {
 
         private final AssociationListener _appAl;

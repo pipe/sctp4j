@@ -128,7 +128,7 @@ public class DCOpen {
         buff.putChar((char) _labLen);
         buff.putChar((char) _protLen);
         buff.put(_label);
-        Buffer bu = (Buffer)buff; // work around for needless incompatibility between JDK 11 and 8
+        Buffer bu = (Buffer) buff; // work around for needless incompatibility between JDK 11 and 8
         bu.position(bu.position() + pad(_labLen));
         buff.put(_protocol);
         bu.position(bu.position() + pad(_protLen));
@@ -170,7 +170,7 @@ public class DCOpen {
             //break;
 
         }
-        Log.info("Dcep open "+ toString());
+        Log.info("Dcep open " + toString());
     }
 
     public String toString() {
@@ -178,7 +178,7 @@ public class DCOpen {
                 + " _chanType =" + (int) _chanType
                 + " _priority = " + _priority
                 + " _reliablity = " + _reliablity
-                + " _label = " + (_label == null?"_null_":new String(_label))
+                + " _label = " + (_label == null ? "_null_" : new String(_label))
                 + " _protocol = " + Packet.getHex(_protocol);
     }
 
@@ -188,23 +188,48 @@ public class DCOpen {
 
     public SCTPStreamBehaviour mkStreamBehaviour(boolean interleaving) {
         SCTPStreamBehaviour behave = null;
-        switch (_chanType) {
-            case RELIABLE:
-                behave = interleaving?new IOrderedStreamBehaviour():new OrderedStreamBehaviour();
-                break;
-            case RELIABLE_UNORDERED:
-                behave = interleaving?new IUnorderedStreamBehaviour():new UnorderedStreamBehaviour();
-                break;
-            // todo these next 4 are wrong... the odering is atleast correct
-            // even if the retry is wrong.
-            case PARTIAL_RELIABLE_REXMIT:
-            case PARTIAL_RELIABLE_TIMED:
-                behave = interleaving?new IOrderedStreamBehaviour():new OrderedStreamBehaviour();
-                break;
-            case PARTIAL_RELIABLE_REXMIT_UNORDERED:
-            case PARTIAL_RELIABLE_TIMED_UNORDERED:
-                behave = interleaving?new IUnorderedStreamBehaviour():new UnorderedStreamBehaviour();
-                break;
+        if (!interleaving) {
+            switch (_chanType) {
+                case RELIABLE:
+                    behave = new OrderedStreamBehaviour();
+                    break;
+                case RELIABLE_UNORDERED:
+                    behave = new UnorderedStreamBehaviour();
+                    break;
+                // todo these next 4 are wrong... the odering is atleast correct
+                // even if the retry is wrong.
+                case PARTIAL_RELIABLE_REXMIT:
+                case PARTIAL_RELIABLE_TIMED:
+                    behave = new OrderedStreamBehaviour();
+                    break;
+                case PARTIAL_RELIABLE_REXMIT_UNORDERED:
+                case PARTIAL_RELIABLE_TIMED_UNORDERED:
+                    behave = new UnorderedStreamBehaviour();
+                    break;
+            }
+        } else {
+            switch (_chanType) {
+                case RELIABLE:
+                    behave = new IOrderedStreamBehaviour(_priority);
+                    break;
+                case RELIABLE_UNORDERED:
+                    behave = new IUnorderedStreamBehaviour(_priority);
+                    break;
+                // todo these next 4 are wrong... the odering is atleast correct
+                // even if the retry is wrong.
+                case PARTIAL_RELIABLE_REXMIT:
+                    behave = new IOrderedStreamBehaviour(_priority).withRexmit(_reliablity);
+                    break;
+                case PARTIAL_RELIABLE_TIMED:
+                    behave = new IOrderedStreamBehaviour(_priority).withTimed(_reliablity);
+                    break;
+                case PARTIAL_RELIABLE_REXMIT_UNORDERED:
+                    behave = new IUnorderedStreamBehaviour(_priority).withRexmit(_reliablity);
+                    break;
+                case PARTIAL_RELIABLE_TIMED_UNORDERED:
+                    behave = new IUnorderedStreamBehaviour(_priority).withTimed(_reliablity);
+                    break;
+            }
         }
         if (behave != null) {
             Log.info(" behaviour is " + behave.getClass().getSimpleName());

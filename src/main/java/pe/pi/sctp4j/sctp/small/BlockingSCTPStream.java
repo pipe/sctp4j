@@ -104,4 +104,14 @@ public class BlockingSCTPStream extends SCTPStream {
             Log.debug("shutdown of Stream-" + this.getNum() + "-Exec");
         }
     }
+
+    @Override
+    public void expired(int mid) {
+        var mess = this.undeliveredOutboundMessages.get(mid);
+        if (mess!= null){
+            mess.expired();
+        } else {
+            Log.info("expired "+this.toString());
+        }
+    }
 }

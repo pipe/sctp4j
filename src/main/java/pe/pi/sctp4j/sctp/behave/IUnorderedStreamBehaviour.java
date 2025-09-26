@@ -10,7 +10,8 @@ package pe.pi.sctp4j.sctp.behave;
  */
 public class IUnorderedStreamBehaviour extends  IOrderedStreamBehaviour{
 
-    public IUnorderedStreamBehaviour() {
+    public IUnorderedStreamBehaviour(int p) {
+        super(p);
         ordered = false;
     }
 

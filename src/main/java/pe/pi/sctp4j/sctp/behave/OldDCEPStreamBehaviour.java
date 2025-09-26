@@ -51,14 +51,12 @@ public class OldDCEPStreamBehaviour implements
         int flags = dc.getFlags() & DataChunk.SINGLEFLAG; // mask to the bits we want
         long tsn = dc.getTsn();
         int messageNo = s.getNextMessageSeqIn();
-       
-        
 
 // only interested in the first chunk which should be an ack or an open.
         DCOpen dcep = dc.getDCEP();
         if (dcep != null) {
             Log.debug("DCEPStreamBehaviour has a dcep first.");
-            if(flags != DataChunk.SINGLEFLAG){
+            if (flags != DataChunk.SINGLEFLAG) {
                 Log.error("Dcep isn't a single !!?!");
             }
             messageNo++;
@@ -98,4 +96,28 @@ public class OldDCEPStreamBehaviour implements
         }
     }
 
+    @Override
+    public boolean isReliable() {
+        return true;
+    }
+
+    @Override
+    public Long getMaxRetries() {
+        return null;
+    }
+
+    @Override
+    public Long getMaxTime() {
+        return null;
+    }
+
+    @Override
+    public Integer getPriority() {
+        return null;
+    }
+
+    @Override
+    public boolean isOrdered() {
+        return true;
+    }
 }

@@ -39,7 +39,9 @@ public class SCTPMessage implements Runnable {
     private SCTPStreamListener _li;
     private boolean _delivered;
     private Runnable onAcked;
-    private int _fsn =0;
+    private Runnable onExpired;
+
+    private int _fsn = 0;
 
     /**
      * Outbound message - note that we assume no one will mess with data between
@@ -103,7 +105,6 @@ public class SCTPMessage implements Runnable {
         }
     }
 
-    
     public SCTPMessage(SCTPStream s, List<IDataChunk> chunks) {
         _stream = s;
         int tot = 0;
@@ -199,7 +200,7 @@ public class SCTPMessage implements Runnable {
         try {
             DCOpen dcep = new DCOpen(bb);
             Association a = _stream.getAssociation();
-            
+
             SCTPStreamBehaviour behave = dcep.mkStreamBehaviour(a.interleaving);
             _stream.setBehave(behave);
             if (!dcep.isAck()) {
@@ -213,7 +214,9 @@ public class SCTPMessage implements Runnable {
                     // so you have to ack before the stream can send anything.
                 } catch (Exception x) {
                     Log.error("Dcep ack failed to send");
-                    if (Log.getLevel() >= Log.DEBUG) {x.printStackTrace();}
+                    if (Log.getLevel() >= Log.DEBUG) {
+                        x.printStackTrace();
+                    }
                     try {
                         _stream.close();
                     } catch (Exception sx) {
@@ -228,7 +231,9 @@ public class SCTPMessage implements Runnable {
             }
         } catch (Exception x) {
             Log.error("Problem with DCOpen " + x.getMessage());
-            if (Log.getLevel() >= Log.DEBUG) {x.printStackTrace();}
+            if (Log.getLevel() >= Log.DEBUG) {
+                x.printStackTrace();
+            }
 
         }
     }
@@ -236,7 +241,7 @@ public class SCTPMessage implements Runnable {
     @Override
     public void run() {
         Log.debug("delegated message delivery from stream of type " + _stream.getClass().getSimpleName());
-        if (_li != null){
+        if (_li != null) {
             Log.debug("delegated message delivery to listener of type " + _li.getClass().getSimpleName());
         }
         byte data[] = _data;
@@ -279,6 +284,16 @@ public class SCTPMessage implements Runnable {
     public void acked() {
         if (onAcked != null) {
             onAcked.run();
+        }
+    }
+
+    public void setExpiredCallBack(Runnable r) {
+        onExpired = r;
+    }
+
+    public void expired() {
+        if (onExpired != null) {
+            onExpired.run();
         }
     }
 

@@ -29,7 +29,7 @@ import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-public abstract class SCTPStream  {
+public abstract class SCTPStream {
 
     /* unfortunately a webRTC SCTP stream can change it's reliability rules etc post creation
      so we can't encapsulate the streams into multiple implementations of the same interface/abstract
@@ -80,12 +80,14 @@ public abstract class SCTPStream  {
                 + "=" + this._label
                 + "|" + _behave.getClass().getSimpleName() + "|"
                 + "->"
-                + ((_sl != null) ? _sl.getClass().getSimpleName() : "null");
+                + ((_sl != null) ? _sl.getClass().getSimpleName() : "null")
+                + "( " + _behave.toString() + ") ";
     }
 
-    public String getBehave(){
-        return  (_behave==null)?"unknown":_behave.getClass().getSimpleName();
+    public String getBehave() {
+        return (_behave == null) ? "unknown" : _behave.getClass().getSimpleName();
     }
+
     /*
     void send(SCTPMessage mess)  {
         try {
@@ -103,7 +105,7 @@ public abstract class SCTPStream  {
 
     public void openAck(DCOpen dcep) throws Exception {
         DCOpen ack = DCOpen.mkAck();
-        Log.debug("made a dcep ack for "+_label);
+        Log.debug("made a dcep ack for " + _label);
         send(ack);
     }
 
@@ -112,9 +114,15 @@ public abstract class SCTPStream  {
     }
 
     void earlyMessageEnqueue(SCTPMessage early) {
-        Log.debug("enqueue an early message seq "+early.getSeq()+" on "+this.toString());
+        Log.debug("enqueue an early message seq " + early.getSeq() + " on " + this.toString());
         _earlyQueue.add(early);
     }
+
+    public boolean isOrdered() {
+        return _behave != null?_behave.isOrdered():true;
+    }
+
+    abstract public void expired(int mid);
 
     enum State {
         CLOSED, INBOUNDONLY, OUTBOUNDONLY, OPEN
@@ -185,15 +193,15 @@ public abstract class SCTPStream  {
 
     public void setSCTPStreamListener(SCTPStreamListener sl) {
         _sl = sl;
-        Log.debug("adding listener for "+this._label+" of "+sl.getClass().getName());
+        Log.debug("adding listener for " + this._label + " of " + sl.getClass().getName());
         if (_earlyQueue != null) {
-            Log.debug("delivering early " + _earlyQueue.size() + " messages to "+sl.getClass().getName());
+            Log.debug("delivering early " + _earlyQueue.size() + " messages to " + sl.getClass().getName());
             SCTPMessage e = null;
             while (null != (e = _earlyQueue.poll())) {
                 e.deliver(_sl);
             }
         } else {
-            Log.debug("no early queue for "+_label);
+            Log.debug("no early queue for " + _label);
         }
     }
 
@@ -286,5 +294,17 @@ public abstract class SCTPStream  {
 
     public boolean idle() {
         return true;
+    }
+
+    public boolean isReliable() {
+        return (_behave != null) ? _behave.isReliable() : true;
+    }
+
+    public Long getMaxTime() {
+        return (_behave != null) ? _behave.getMaxTime() : null;
+    }
+
+    public Long getMaxRetries() {
+        return (_behave != null) ? _behave.getMaxRetries() : null;
     }
 }

@@ -122,4 +122,31 @@ public class OrderedStreamBehaviour implements SCTPStreamBehaviour {
         return null;
     }
 
+    @Override
+    public boolean isReliable() {
+        return true;
+    }
+
+    @Override
+    public Long getMaxRetries() {
+        return null;
+    }
+
+    @Override
+    public Long getMaxTime() {
+        return null;
+    }
+
+    @Override
+    public Integer getPriority() {
+        return null;
+    }
+    public String toString(){
+        return " behave :"+(_ordered?"ordered":"unordered")+ " reliable (blocking - no interleave)";
+    }
+
+    @Override
+    public boolean isOrdered() {
+        return _ordered;
+    }
 }

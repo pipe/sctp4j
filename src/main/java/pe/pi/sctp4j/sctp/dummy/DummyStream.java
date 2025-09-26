@@ -40,5 +40,9 @@ public class DummyStream extends SCTPStream{
     @Override
     public void deliverMessage(SCTPMessage message) {
     }
+
+    @Override
+    public void expired(int mid) {
+    }
     
 }

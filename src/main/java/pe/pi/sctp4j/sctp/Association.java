@@ -890,9 +890,8 @@ abstract public class Association {
         return ret;
     }
 
-    protected SCTPStream getStream(int s) {
+    public SCTPStream getStream(int s) {
         return _streams.get(s);
-
     }
 
     SCTPStream delStream(int s) {
