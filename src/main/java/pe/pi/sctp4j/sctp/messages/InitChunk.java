@@ -106,8 +106,10 @@ public class InitChunk extends Chunk {
                 + " numInStreams : " + _numInStreams
                 + " initialTSN : " + _initialTSN
                 + " farForwardTSNsupported : " + _farForwardTSNsupported
-                + ((_farSupportedExtensions == null) ? " no supported extensions" : " supported extensions are: " + chunksToNames(_farSupportedExtensions));
-        return ret;
+                + ((_farSupportedExtensions == null) ? " no far supported extensions" : " supported extensions are: " + chunksToNames(_farSupportedExtensions))
+                 + " forwardTSNsupported : " + true
+               + ((_supportedExtensions == null) ? " no supported extensions" : " supported extensions are: " + chunksToNames(_supportedExtensions));
+       return ret;
     }
 
     @Override

@@ -161,6 +161,7 @@ public class ThreadedAssociation extends Association implements Runnable {
 
     void makeFree() {
         // this is the first time we know which we will do.
+        Log.info("Creating a freelist with interleaving = "+interleaving);
         for (int i = 0; i < MAXBLOCKS; i++) {
             DataChunk dc = this.interleaving ? new IDataChunk() : new ClassicDataChunk();
             _freeBlocks.add(dc);

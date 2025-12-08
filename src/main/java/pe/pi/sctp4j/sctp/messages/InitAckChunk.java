@@ -130,8 +130,12 @@ public class InitAckChunk extends Chunk {
                 Log.verb("variable of type: " + v.getName() + " " + v.toString());
                 if (v instanceof StateCookie) {
                     _cookie = ((StateCookie) v).getData();
+                } if (v instanceof SupportedExtensions ){
+                    _supportedExtensions = ((SupportedExtensions)v).getData();
+                } if (v instanceof ForwardTSNsupported ){
+                    _forwardTSNsupported = true;
                 } else {
-                    Log.verb("ignored variable of type: " + v.getName());
+                    Log.warn("ignored variable of type: " + v.getName());
                 }
             }
 
@@ -172,7 +176,7 @@ public class InitAckChunk extends Chunk {
         }
     }
 
-    public byte[] getSupportedExtensions(byte[] v) {
+    public byte[] getSupportedExtensions() {
         return _supportedExtensions;
     }
 

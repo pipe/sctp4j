@@ -215,7 +215,7 @@ public class SCTPMessage implements Runnable {
                 } catch (Exception x) {
                     Log.error("Dcep ack failed to send");
                     if (Log.getLevel() >= Log.DEBUG) {
-                        x.printStackTrace();
+                        x.printStackTrace(System.out);
                     }
                     try {
                         _stream.close();
@@ -232,7 +232,7 @@ public class SCTPMessage implements Runnable {
         } catch (Exception x) {
             Log.error("Problem with DCOpen " + x.getMessage());
             if (Log.getLevel() >= Log.DEBUG) {
-                x.printStackTrace();
+                x.printStackTrace(System.out);
             }
 
         }

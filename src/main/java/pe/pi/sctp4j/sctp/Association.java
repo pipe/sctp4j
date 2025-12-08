@@ -40,6 +40,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.bouncycastle.tls.DatagramTransport;
 import pe.pi.sctp4j.sctp.dataChannel.DECP.DCOpen;
+import pe.pi.sctp4j.sctp.small.MessageSizeExceededException;
 
 /**
  *
@@ -97,7 +98,8 @@ abstract public class Association {
         SHUTDOWNACKSENT, CLOSED
     };
 
-    private byte[] _supportedExtensions = {(byte) Chunk.RE_CONFIG, (byte) Chunk.I_FORWARD_TSN,(byte)Chunk.I_DATA};
+    final static byte[] SUPPORTEDEXTENSIONS = {(byte) Chunk.RE_CONFIG, (byte) Chunk.I_FORWARD_TSN, (byte) Chunk.I_DATA};
+
     /*
      For what it is worth, here's the logic as to why we don't have any supported extensions.
      { 
@@ -106,7 +108,6 @@ abstract public class Association {
      PKTDROP, // thie is an optional performance enhancement especially valuable for middleboxes (we aren't one)
      AUTH // Assume DTLS will cover this for us if we never send ASCONF packets.
      */
-
     public static int COOKIESIZE = 40;
     private static long VALIDCOOKIELIFE = 60000;
     /*
@@ -149,7 +150,7 @@ abstract public class Association {
     private String peerId;
 
     protected boolean interleaving = false;
-    
+
     class CookieHolder {
 
         byte[] cookieData;
@@ -158,7 +159,9 @@ abstract public class Association {
     private final ArrayList<CookieHolder> _cookies = new ArrayList();
 
     protected byte[] getSupportedExtensions() { // this lets others swithc features off.
-        return _supportedExtensions;
+        byte[] ret = new byte[SUPPORTEDEXTENSIONS.length];
+        System.arraycopy(SUPPORTEDEXTENSIONS, 0, ret, 0, ret.length);
+        return ret;
     }
 
     long getNearTSN() {
@@ -175,18 +178,20 @@ abstract public class Association {
 
     byte[] getUnionSupportedExtensions(byte far[]) {
         ByteBuffer unionbb = ByteBuffer.allocate(far.length);
+        byte[] sex = getSupportedExtensions();
+
         if (Log.getLevel() >= Log.INFO) {
             StringBuilder extnames = new StringBuilder("Supported Extensions: ");
-            for (byte x : _supportedExtensions) {
+            for (byte x : sex) {
                 extnames.append("\n\t").append(Chunk.typeLookup(x));
             }
             Log.info(extnames.toString());
         }
         for (int f = 0; f < far.length; f++) {
             Log.info("offered extension " + Chunk.typeLookup(far[f]));
-            for (int n = 0; n < _supportedExtensions.length; n++) {
-                if (_supportedExtensions[n] == far[f]) {
-                    Log.info("matching extension " + Chunk.typeLookup(_supportedExtensions[n]));
+            for (int n = 0; n < sex.length; n++) {
+                if (sex[n] == far[f]) {
+                    Log.info("matching extension " + Chunk.typeLookup(sex[n]));
                     unionbb.put(far[f]);
                 }
             }
@@ -194,13 +199,15 @@ abstract public class Association {
         byte[] res = new byte[((Buffer) unionbb).position()];
         ((Buffer) unionbb).rewind();
         unionbb.get(res);
-        for(byte b:res){
-            if (b == (byte) Chunk.I_DATA){
+        for (byte b : res) {
+            if (b == (byte) Chunk.I_DATA) {
                 interleaving = true;
                 break;
             }
         }
-        Log.verb("union of extensions contains :" + Chunk.chunksToNames(res));
+        Log.info("interleaving is set to " + interleaving);
+
+        Log.info("union of extensions contains :" + Chunk.chunksToNames(res));
         return res;
     }
 
@@ -395,7 +402,7 @@ abstract public class Association {
             case Chunk.INIT:
                 if (acceptableStateForInboundInit()) {
                     InitChunk init = (InitChunk) c;
-                    Log.info("got init "+init.toString());
+                    Log.info("got init " + init.toString());
                     reply = inboundInit(init);
                 } else {
                     Log.debug("Got an INIT when state was " + _state.name() + " - ignoring it for now ");
@@ -560,7 +567,9 @@ abstract public class Association {
         c.setNumOutStreams(this.MAXSTREAMS);
         c.setAdRecWinCredit(this.MAXBUFF);
         c.setInitiate(this.getMyVerTag());
-        c.setSupportedExtensions(_supportedExtensions);
+        byte[] sex = getSupportedExtensions();
+
+        c.setSupportedExtensions(sex);
         Chunk[] s = new Chunk[1];
         s[0] = c;
         this._state = State.COOKIEWAIT;
@@ -580,7 +589,14 @@ abstract public class Association {
         _maxOutStreams = Math.min(iack.getNumInStreams(), MAXSTREAMS);
         _maxInStreams = Math.min(iack.getNumOutStreams(), MAXSTREAMS);
 
-        iack.getSupportedExtensions(_supportedExtensions);
+        byte[] sex = iack.getSupportedExtensions();
+
+        for (byte b : sex) {
+            if (b == (byte) Chunk.I_DATA) {
+                interleaving = true;
+                break;
+            }
+        }
         byte[] data = iack.getCookie();
         CookieEchoChunk ce = new CookieEchoChunk();
         ce.setCookieData(data);
@@ -660,7 +676,7 @@ abstract public class Association {
         if (fse != null) {
             iac.setSupportedExtensions(this.getUnionSupportedExtensions(fse));
         }
-        if (init.isFarForwardTSNsupported()){
+        if (init.isFarForwardTSNsupported()) {
             iac.setForwardTSNsupported(true);
         }
         reply = new Chunk[1];
@@ -990,27 +1006,31 @@ abstract public class Association {
     }
 
     //abstract public void sendAndBlock(SCTPMessage m) throws Exception;
-    synchronized public SCTPMessage makeMessage(byte[] bytes, SCTPStream s) {
+    synchronized public SCTPMessage makeMessage(byte[] bytes, SCTPStream s) throws MessageSizeExceededException {
         SCTPMessage m = null;
         if (canSend()) {
-            if (bytes.length < this.maxMessageSize()) {
+            if (bytes.length <= this.maxMessageSize()) {
                 m = new SCTPMessage(bytes, s);
                 s.setAsNextMessage(m);
             } else {
                 Log.warn("Message too long " + bytes.length + " > " + this.maxMessageSize());
+                throw new MessageSizeExceededException();
+
             }
         }
         return m;
     }
 
-    synchronized public SCTPMessage makeMessage(String string, SCTPStream s) {
+    synchronized public SCTPMessage makeMessage(String string, SCTPStream s) throws MessageSizeExceededException {
         SCTPMessage m = null;
         if (canSend()) {
-            if (string.length() < this.maxMessageSize()) {
+            if (string.length() <= this.maxMessageSize()) {
                 m = new SCTPMessage(string, s);
                 s.setAsNextMessage(m);
             } else {
                 Log.warn("Message too long " + string.length() + " > " + this.maxMessageSize());
+
+                throw new MessageSizeExceededException();
             }
         }
         return m;

@@ -21,7 +21,7 @@ package pe.pi.sctp4j.sctp.small;
  *
  * @author Westhawk Ltd<thp@westhawk.co.uk>
  */
-class MessageSizeExceededException extends Exception {
+public class MessageSizeExceededException extends Exception {
 
     public MessageSizeExceededException() {
     }

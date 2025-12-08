@@ -179,7 +179,7 @@ public class DCOpen {
                 + " _priority = " + _priority
                 + " _reliablity = " + _reliablity
                 + " _label = " + (_label == null ? "_null_" : new String(_label))
-                + " _protocol = " + Packet.getHex(_protocol);
+                + " _protocol = " + ( _protocol == null ? "_null_" : Packet.getHex(_protocol));
     }
 
     public boolean isAck() {
