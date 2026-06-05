@@ -119,7 +119,7 @@ public class ThreadedAssociation extends Association implements Runnable {
 
      To do .....
      */
-    private int _transpMTU = 768;
+    private int _transpMTU = 1250;
     private Thread retryThread;
     private Chunk[] _stashCookieEcho;
     private final Object _congestion = new Object();
@@ -146,7 +146,9 @@ public class ThreadedAssociation extends Association implements Runnable {
     public ThreadedAssociation(DatagramTransport transport, AssociationListener al) {
         super(transport, new ExecutorAssociationListener(al));
         try {
-            _transpMTU = Math.min(transport.getReceiveLimit(), transport.getSendLimit());
+            if (transport != null) {
+                _transpMTU = Math.min(transport.getReceiveLimit(), transport.getSendLimit());
+            }
             Log.debug("Transport MTU is now " + _transpMTU);
         } catch (IOException x) {
             Log.warn("Failed to get suitable transport mtu ");
@@ -161,7 +163,7 @@ public class ThreadedAssociation extends Association implements Runnable {
 
     void makeFree() {
         // this is the first time we know which we will do.
-        Log.info("Creating a freelist with interleaving = "+interleaving);
+        Log.info("Creating a freelist with interleaving = " + interleaving);
         for (int i = 0; i < MAXBLOCKS; i++) {
             DataChunk dc = this.interleaving ? new IDataChunk() : new ClassicDataChunk();
             _freeBlocks.add(dc);
@@ -982,16 +984,18 @@ public class ThreadedAssociation extends Association implements Runnable {
     }
 
 // takes the callback invocation off the rcv thread
-    private static class ExecutorAssociationListener implements AssociationListener, AutoCloseable {
+    protected static class ExecutorAssociationListener implements AssociationListener, AutoCloseable {
 
         private final AssociationListener _appAl;
-        private final ExecutorService _ex;
+        private ExecutorService _ex = null;
         private int id = 0;
 
         public ExecutorAssociationListener(AssociationListener al) {
             _appAl = al;
-            id = __assocNo - 1;
-            _ex = Executors.newSingleThreadExecutor((Runnable r) -> new Thread(r, "Assoc-" + id + "-Exec"));
+            if (al != null) {
+                id = __assocNo - 1;
+                _ex = Executors.newSingleThreadExecutor((Runnable r) -> new Thread(r, "Assoc-" + id + "-Exec"));
+            }
         }
 
         @Override

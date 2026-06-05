@@ -92,7 +92,7 @@ public abstract class Chunk {
       field will be set to 4.  The Chunk Length field does not count any
       chunk padding.
      */
-    static Chunk mkChunk(ByteBuffer pkt) {
+    public static Chunk mkChunk(ByteBuffer pkt) {
         Chunk ret = null;
         if (pkt.remaining() >= 4) {
             byte type = pkt.get();
@@ -275,7 +275,7 @@ public abstract class Chunk {
         bb.putInt((int) (value & 0xffffffffL));
     }
 
-    void write(ByteBuffer ret) throws SctpPacketFormatException {
+    protected void write(ByteBuffer ret) throws SctpPacketFormatException {
         ret.put(_type);
         ret.put(_flags);
         ret.putChar((char) 4); // marker for length;

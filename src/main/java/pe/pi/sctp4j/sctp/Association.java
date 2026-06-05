@@ -124,22 +124,22 @@ abstract public class Association {
      HB.interval - 30 seconds
      HB.Max.Burst - 1
      */
-    protected final DatagramTransport _transp;
+    protected DatagramTransport _transp;
     private Thread _rcv;
-    private int _peerVerTag;
+    protected int _peerVerTag;
     protected int _myVerTag;
     private final SecureRandom _random;
     private long _winCredit;
     private long _farTSN;
-    private int MAXSTREAMS = 1000;
+    final static protected int MAXSTREAMS = 1000;
     private int _maxOutStreams = 256;
     private int _maxInStreams = 256;
-    final static int MAXBUFF = 128 * 1024;
+    protected final static int MAXBUFF = 128 * 1024;
     public long _nearTSN;
-    private int _srcPort;
-    private int _destPort;
+    protected int _srcPort;
+    protected int _destPort;
     final private ConcurrentHashMap<Integer, SCTPStream> _streams;
-    private final AssociationListener _al;
+    protected AssociationListener _al;
     private HashMap<Long, DataChunk> _outbound;
     protected State _state;
     private HashMap<Long, DataChunk> _holdingPen;
@@ -322,7 +322,7 @@ abstract public class Association {
         if (_transp != null) {
             startRcv();
         } else {
-            Log.error("Created an Associaction with a null transport somehow...");
+            Log.warn("Created an Associaction with a null transport probably for SNAP...");
         }
         __assocNo++;
         /*
